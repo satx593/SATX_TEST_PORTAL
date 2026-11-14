@@ -54,10 +54,17 @@
                     </div>
 
                     {% if r.trainer_feedback %}
-                    <div class="p-2 px-3 bg-light border rounded small mt-3">
-                        <strong class="text-secondary"><i class="bi bi-chat-left-quote-fill me-1"></i>Trainer Feedback:</strong>
-                        <p class="mb-0 text-muted">{{ r.trainer_feedback }}</p>
-                    </div>
+                        {% if "Terminated due to multiple tab switch" in r.trainer_feedback %}
+                        <div class="alert alert-danger py-2 small mt-3 border-danger shadow-sm">
+                            <strong class="d-block"><i class="bi bi-x-octagon-fill me-1"></i>Exam Terminated by AI Proctoring System:</strong>
+                            Candidate was expelled after exceeding the maximum limit of 3 tab-switching warnings.
+                        </div>
+                        {% else %}
+                        <div class="p-2 px-3 bg-light border rounded small mt-3">
+                            <strong class="text-secondary"><i class="bi bi-chat-left-quote-fill me-1"></i>Trainer Feedback:</strong>
+                            <p class="mb-0 text-muted">{{ r.trainer_feedback }}</p>
+                        </div>
+                        {% endif %}
                     {% endif %}
                 </div>
             </div>

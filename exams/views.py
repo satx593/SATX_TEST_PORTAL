@@ -360,7 +360,7 @@ def exam_instructions(request, exam_id):
     assignment = get_object_or_404(ExamAssignment, exam=exam, student=request.user)
     if assignment.status == 'COMPLETED':
         messages.info(request, "You have already completed this examination.")
-        return redirect('student_dashboard')
+        return redirect('student_results')
 
     return render(request, 'student/exam_instructions.html', {
         'exam': exam,
@@ -376,7 +376,7 @@ def take_exam(request, exam_id):
 
     if assignment.status == 'COMPLETED':
         messages.info(request, "You have already submitted this examination.")
-        return redirect('student_dashboard')
+        return redirect('student_results')
 
     # Create or retrieve ongoing session
     session, _ = ExamSession.objects.get_or_create(
@@ -385,6 +385,11 @@ def take_exam(request, exam_id):
         is_submitted=False,
         defaults={'ip_address': request.META.get('REMOTE_ADDR')}
     )
+
+    if session.is_submitted or session.tab_switch_count > 3:
+        messages.error(request, "This examination was terminated and submitted because you exceeded 3 tab-switching warnings.")
+        return redirect('student_results')
+
     assignment.status = 'IN_PROGRESS'
     assignment.save()
 
@@ -419,7 +424,8 @@ def take_exam(request, exam_id):
         'session': session,
         'remaining_seconds': remaining_seconds,
         'questions_json': json.dumps(questions_data),
-        'questions_count': len(questions_data)
+        'questions_count': len(questions_data),
+        'initial_tab_switches': session.tab_switch_count
     })
 
 
@@ -481,15 +487,22 @@ def proctoring_event_api(request):
             details=details
         )
 
-        return JsonResponse({'status': 'recorded'})
+        is_terminated = session.tab_switch_count > 3
+        return JsonResponse({
+            'status': 'recorded',
+            'tab_switch_count': session.tab_switch_count,
+            'is_terminated': is_terminated
+        })
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 
 @login_required
 def submit_exam(request, session_id):
-    """Final examination submission and automatic scoring."""
+    """Final examination submission and automatic scoring with tab switch termination support."""
     session = get_object_or_404(ExamSession, id=session_id, student=request.user)
+    reason = request.GET.get('reason') or request.POST.get('reason') or ''
+    was_terminated = (reason == 'tab_switch_violation') or (session.tab_switch_count > 3)
 
     if not session.is_submitted:
         with transaction.atomic():
@@ -528,6 +541,8 @@ def submit_exam(request, session_id):
             percentage = (total_score / total_marks * 100) if total_marks > 0 else Decimal('0.0')
             is_passed = total_score >= Decimal(str(exam.pass_marks))
 
+            feedback = "Terminated due to multiple tab switch violations (Exceeded 3 warnings)." if was_terminated else ""
+
             # Create or update Result
             Result.objects.update_or_create(
                 exam=exam,
@@ -540,7 +555,8 @@ def submit_exam(request, session_id):
                     'score': total_score,
                     'percentage': percentage,
                     'is_passed': is_passed,
-                    'is_published': True,  # Auto-publish for instant feedback
+                    'is_published': True,
+                    'trainer_feedback': feedback,
                     'published_at': timezone.now()
                 }
             )
@@ -551,7 +567,10 @@ def submit_exam(request, session_id):
                 assignment.status = 'COMPLETED'
                 assignment.save()
 
-    messages.success(request, "Your examination has been submitted successfully.")
+    if was_terminated:
+        messages.error(request, "Your examination was automatically terminated and submitted because you exceeded 3 tab-switching warnings.")
+    else:
+        messages.success(request, "Your examination has been submitted successfully.")
     return redirect('student_results')
 
 

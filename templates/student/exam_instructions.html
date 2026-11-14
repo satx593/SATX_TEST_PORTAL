@@ -19,7 +19,12 @@
                                 <li><i class="bi bi-check-circle-fill text-success me-2"></i>Total Marks: <strong>{{ exam.total_marks }}</strong> (Pass Marks: <strong>{{ exam.pass_marks }}</strong>)</li>
                                 <li><i class="bi bi-check-circle-fill text-success me-2"></i>Duration: <strong>{{ exam.duration_minutes }} Minutes</strong> controlled by server countdown timer.</li>
                                 <li><i class="bi bi-check-circle-fill text-success me-2"></i>Answers are <strong>auto-saved instantly</strong> upon selecting an option.</li>
-                                <li><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i><strong>Do not switch browser tabs</strong> or exit fullscreen mode. Violations are logged.</li>
+                                <li><i class="bi bi-arrows-fullscreen text-primary me-2"></i><strong>Fullscreen Mode is mandatory:</strong> The platform will automatically enter fullscreen mode upon starting.</li>
+                                <li class="p-2 bg-danger bg-opacity-10 rounded border border-danger-subtle">
+                                    <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
+                                    <strong class="text-danger">STRICT 3-WARNING TAB SWITCH POLICY:</strong><br>
+                                    <small class="text-dark">If you switch tabs or minimize the window, you will receive up to <strong>3 official warnings</strong>. On the <strong>4th switch (above 3 warnings)</strong>, you will be <strong>instantly expelled from the platform</strong> and your exam will be automatically submitted!</small>
+                                </li>
                                 <li><i class="bi bi-camera-video-fill text-primary me-2"></i>Ensure your webcam is enabled and your face is clearly visible throughout the exam.</li>
                             </ul>
                         </div>
@@ -32,13 +37,20 @@
                         </div>
                     </div>
 
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="agreeFullscreenCheck" required checked>
+                        <label class="form-check-label small fw-semibold" for="agreeFullscreenCheck">
+                            I understand that Fullscreen Mode is mandatory and that exceeding 3 tab-switching warnings will result in immediate termination and expulsion from the examination.
+                        </label>
+                    </div>
+
                     <div class="d-flex justify-content-between align-items-center pt-3 border-top">
                         <a href="{% url 'student_dashboard' %}" class="btn btn-outline-secondary">
                             <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
                         </a>
-                        <a href="{% url 'take_exam' exam_id=exam.id %}" class="btn btn-pumo px-4 py-2 fs-6 shadow" id="startExamBtn">
-                            <i class="bi bi-play-circle-fill me-2"></i>Start Examination Now
-                        </a>
+                        <button type="button" class="btn btn-pumo px-4 py-2 fs-6 shadow" id="startExamBtn" onclick="startFullscreenExam('{% url 'take_exam' exam_id=exam.id %}')">
+                            <i class="bi bi-fullscreen me-2"></i>Enter Fullscreen &amp; Start Exam
+                        </button>
                     </div>
                 </div>
             </div>
@@ -64,6 +76,28 @@
             });
     } else {
         statusText.innerHTML = '<span class="text-warning">Webcam not supported by browser</span>';
+    }
+
+    function startFullscreenExam(targetUrl) {
+        const checkbox = document.getElementById('agreeFullscreenCheck');
+        if (!checkbox.checked) {
+            alert('Please confirm that you agree to the examination fullscreen and tab-switch integrity policy.');
+            return;
+        }
+
+        const docElm = document.documentElement;
+        if (docElm.requestFullscreen) {
+            docElm.requestFullscreen().then(() => {
+                window.location.href = targetUrl;
+            }).catch(() => {
+                window.location.href = targetUrl;
+            });
+        } else if (docElm.webkitRequestFullscreen) {
+            docElm.webkitRequestFullscreen();
+            window.location.href = targetUrl;
+        } else {
+            window.location.href = targetUrl;
+        }
     }
 </script>
 {% endblock %}

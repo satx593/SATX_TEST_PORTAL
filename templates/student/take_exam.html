@@ -3,25 +3,35 @@
 {% block title %}Examination Room - {{ exam.title }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-lg-4 py-3">
+<div class="container-fluid px-lg-4 py-3" id="examContainer">
     <!-- Exam Room Top Header -->
     <div class="card card-pumo mb-3 border-primary shadow-sm">
         <div class="card-body py-2 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
                 <h5 class="fw-bold text-primary mb-0"><i class="bi bi-mortarboard-fill me-2"></i>{{ exam.title }}</h5>
-                <small class="text-muted">Candidate: <strong>{{ user.get_full_name|default:user.username }}</strong> &bull; Total Questions: <span id="totalQuestionsCount">{{ questions_count }}</span></small>
+                <small class="text-muted">
+                    Candidate: <strong>{{ user.get_full_name|default:user.username }}</strong> &bull; 
+                    Total Questions: <span id="totalQuestionsCount">{{ questions_count }}</span>
+                </small>
             </div>
 
-            <!-- Countdown Timer & Auto-Save Badge -->
-            <div class="d-flex align-items-center gap-3">
-                <span class="badge bg-light text-muted border" id="autoSaveIndicator">
+            <!-- Warning Badge, Timer & Submit -->
+            <div class="d-flex align-items-center gap-2 gap-md-3">
+                <!-- Warnings Counter Badge (Max 3) -->
+                <span class="badge px-3 py-2 fs-6 shadow-sm" id="warningBadge" style="background-color: #10b981; color: white;">
+                    <i class="bi bi-shield-exclamation me-1"></i>Warnings: <span id="warningCounter">0</span> / 3
+                </span>
+
+                <span class="badge bg-light text-muted border d-none d-sm-inline" id="autoSaveIndicator">
                     <i class="bi bi-cloud-check text-success me-1"></i>Saved
                 </span>
+
                 <div class="exam-timer">
                     <i class="bi bi-stopwatch text-danger"></i>
                     <span id="timerDisplay">--:--</span>
                 </div>
-                <button type="button" class="btn btn-danger px-3" onclick="confirmSubmit()">
+
+                <button type="button" class="btn btn-danger px-3 shadow-sm" onclick="confirmSubmit()">
                     <i class="bi bi-check2-circle me-1"></i>Finish &amp; Submit
                 </button>
             </div>
@@ -76,7 +86,7 @@
             <div class="card card-pumo mb-3 text-center p-2">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <small class="text-uppercase fw-bold text-danger" style="font-size: 0.72rem;">
-                        <i class="bi bi-record-circle-fill me-1 animate-pulse"></i>AI Proctor Active
+                        <i class="bi bi-record-circle-fill me-1"></i>AI Proctor Active
                     </small>
                     <span class="badge bg-success-subtle text-success small" style="font-size: 0.65rem;">Monitoring</span>
                 </div>
@@ -112,9 +122,94 @@
     </div>
 </div>
 
-<!-- Modal: Confirm Final Submission -->
+<!-- ==========================================
+     PROCTORING & SECURITY MODALS
+     ========================================== -->
+
+<!-- 1. Fullscreen Required Modal (Overlay) -->
+<div id="fullscreenOverlayModal" style="display: none; position: fixed; inset: 0; background: rgba(10, 25, 47, 0.96); z-index: 99999; justify-content: center; align-items: center;">
+    <div class="card card-pumo text-center p-4 shadow-lg border-primary" style="max-width: 520px; margin: 15px;">
+        <div class="mb-3 text-primary">
+            <i class="bi bi-arrows-fullscreen" style="font-size: 3.5rem;"></i>
+        </div>
+        <h4 class="fw-bold text-primary mb-2">Fullscreen Mode Required</h4>
+        <p class="text-secondary mb-3">
+            To maintain test integrity, this exam must remain in <strong>Fullscreen Mode</strong> at all times.
+        </p>
+        <div class="alert alert-warning py-2 small mb-4 text-start">
+            <i class="bi bi-exclamation-triangle-fill me-1 text-danger"></i>
+            <strong>Zero-Tolerance Tab-Switch Rule:</strong> You are granted a maximum of <strong>3 warnings</strong>. Any tab switch above 3 warnings will result in immediate disqualification and auto-submission.
+        </div>
+        <button type="button" class="btn btn-pumo py-2 fs-6 shadow w-100" onclick="enterFullscreen()">
+            <i class="bi bi-fullscreen me-2"></i>Resume / Enter Fullscreen Mode
+        </button>
+    </div>
+</div>
+
+<!-- 2. Tab Switch Warning Modal (1 of 3, 2 of 3, 3 of 3) -->
+<div class="modal fade" id="tabWarningModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-danger shadow-lg">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold" id="tabWarningTitle">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Warning: Tab Switching Detected!
+                </h5>
+            </div>
+            <div class="modal-body text-center p-4">
+                <div class="mb-3 text-danger">
+                    <i class="bi bi-shield-slash-fill" style="font-size: 3.5rem;"></i>
+                </div>
+                <h5 class="fw-bold text-dark mb-2" id="tabWarningHeading">Tab Switch Violation Recorded</h5>
+                <p class="text-muted" id="tabWarningBody">
+                    You have navigated away from the active examination window or minimized the browser.
+                </p>
+                <div class="p-3 bg-danger bg-opacity-10 border border-danger rounded mb-3">
+                    <strong class="text-danger d-block fs-6" id="tabWarningRemaining">
+                        Warnings remaining: 2
+                    </strong>
+                </div>
+                <button type="button" class="btn btn-danger px-4 py-2 w-100 shadow" onclick="dismissTabWarning()">
+                    <i class="bi bi-check2-circle me-1"></i>I Understand &amp; Return to Examination
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 3. Expelled Modal (Above 3 Warnings -> Auto Expel) -->
+<div class="modal fade" id="expelledModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-danger shadow-lg">
+            <div class="modal-header bg-dark text-danger">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-x-octagon-fill me-2"></i>EXAMINATION TERMINATED
+                </h5>
+            </div>
+            <div class="modal-body text-center p-4">
+                <div class="mb-3 text-danger">
+                    <i class="bi bi-door-closed-fill" style="font-size: 4rem;"></i>
+                </div>
+                <h4 class="fw-bold text-danger mb-2">Expelled from Examination Platform</h4>
+                <p class="text-secondary mb-3">
+                    You have exceeded the maximum allowed limit of <strong>3 tab-switching warnings</strong>. 
+                    Your examination has been automatically submitted and terminated.
+                </p>
+                <div class="alert alert-danger py-2 small mb-3 text-start">
+                    <div><strong>Violation:</strong> Exceeded 3 Tab-Switch Warnings</div>
+                    <div><strong>Action:</strong> Disqualified / Automatic Submission</div>
+                </div>
+                <div class="spinner-border text-danger mt-2" role="status">
+                    <span class="visually-hidden">Terminating...</span>
+                </div>
+                <p class="small text-muted mt-2">Redirecting to results...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 4. Confirm Manual Submission Modal -->
 <div class="modal fade" id="submitConfirmModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold text-primary"><i class="bi bi-shield-check me-2"></i>Submit Examination?</h5>
@@ -152,6 +247,14 @@
     let currentIndex = 0;
     const studentAnswers = {};
     const reviewStatus = {};
+    let isExamSubmitted = false;
+
+    // Warning System State (Max 3 Warnings)
+    let warningCount = {{ initial_tab_switches|default:0 }};
+    const MAX_WARNINGS = 3;
+    let lastTabSwitchTime = 0;
+    const tabWarningModal = new bootstrap.Modal(document.getElementById('tabWarningModal'));
+    const expelledModal = new bootstrap.Modal(document.getElementById('expelledModal'));
 
     // Initialize saved answers
     questions.forEach((q, idx) => {
@@ -159,9 +262,161 @@
         reviewStatus[q.id] = false;
     });
 
-    // 1. Countdown Timer
+    // 1. Audio Warning Alert (Web Audio API)
+    function playWarningBeep() {
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.3);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.5);
+        } catch (e) {
+            console.log('Audio alert blocked:', e);
+        }
+    }
+
+    // 2. Fullscreen Enforcement
+    function isFullscreenActive() {
+        return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+    }
+
+    function checkFullscreenState() {
+        if (isExamSubmitted) return;
+        const overlay = document.getElementById('fullscreenOverlayModal');
+        if (!isFullscreenActive()) {
+            overlay.style.display = 'flex';
+        } else {
+            overlay.style.display = 'none';
+        }
+    }
+
+    function enterFullscreen() {
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen().catch(err => console.log(err));
+        } else if (elem.webkitRequestFullscreen) {
+            elem.webkitRequestFullscreen();
+        } else if (elem.msRequestFullscreen) {
+            elem.msRequestFullscreen();
+        }
+        document.getElementById('fullscreenOverlayModal').style.display = 'none';
+    }
+
+    document.addEventListener('fullscreenchange', function() {
+        if (!isFullscreenActive() && !isExamSubmitted) {
+            checkFullscreenState();
+            handleTabSwitch('FULLSCREEN_EXIT', 'Candidate exited fullscreen mode');
+        }
+    });
+
+    // Initial Fullscreen check after page load
+    window.addEventListener('load', function() {
+        setTimeout(checkFullscreenState, 600);
+        updateWarningBadgeUI();
+    });
+
+    // 3. Update Warning Counter Badge
+    function updateWarningBadgeUI() {
+        const badge = document.getElementById('warningBadge');
+        const counter = document.getElementById('warningCounter');
+        counter.innerText = warningCount;
+
+        if (warningCount === 0) {
+            badge.style.backgroundColor = '#10b981'; // Green
+        } else if (warningCount === 1) {
+            badge.style.backgroundColor = '#f59e0b'; // Yellow
+        } else if (warningCount === 2) {
+            badge.style.backgroundColor = '#ea580c'; // Orange
+        } else if (warningCount >= 3) {
+            badge.style.backgroundColor = '#dc2626'; // Red
+        }
+    }
+
+    // 4. Tab Switch Handler (3 Warnings System + Expulsion Above 3)
+    function handleTabSwitch(eventType, details) {
+        if (isExamSubmitted) return;
+
+        const now = Date.now();
+        // Debounce by 1.5 seconds to prevent double triggers
+        if (now - lastTabSwitchTime < 1500) return;
+        lastTabSwitchTime = now;
+
+        warningCount++;
+        playWarningBeep();
+        updateWarningBadgeUI();
+
+        // Send telemetry log to backend
+        logProctoringEvent(eventType, `${details} (Violation #${warningCount})`);
+
+        if (warningCount > MAX_WARNINGS) {
+            // Above 3 warnings -> EXPELLED IMMEDIATELY!
+            isExamSubmitted = true;
+            expelledModal.show();
+            document.getElementById('proctorAlertMsg').innerHTML = '<span class="text-danger fw-bold"><i class="bi bi-x-octagon-fill me-1"></i>EXPELLED: Exceeded 3 Warnings</span>';
+            setTimeout(function() {
+                window.location.href = "{% url 'submit_exam' session_id=session.id %}?reason=tab_switch_violation";
+            }, 2500);
+            return;
+        }
+
+        // Show Warning Modal for 1, 2, or 3
+        const titleEl = document.getElementById('tabWarningTitle');
+        const headingEl = document.getElementById('tabWarningHeading');
+        const remainingEl = document.getElementById('tabWarningRemaining');
+
+        if (warningCount === 1) {
+            titleEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>Warning 1 of 3: Tab Switching Detected!';
+            headingEl.innerText = 'First Tab Switch Warning';
+            remainingEl.innerHTML = 'You have <strong>2 warnings remaining</strong> before your exam is automatically terminated!';
+        } else if (warningCount === 2) {
+            titleEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>Warning 2 of 3: Tab Switching Detected!';
+            headingEl.innerText = 'Second Tab Switch Warning';
+            remainingEl.innerHTML = 'You have <strong>ONLY 1 warning remaining</strong>! Any further switch will lead to expulsion.';
+        } else if (warningCount === 3) {
+            titleEl.innerHTML = '<i class="bi bi-shield-fill-x me-2"></i>FINAL WARNING (3 of 3): Tab Switching Detected!';
+            headingEl.innerText = 'FINAL WARNING: Maximum Violations Reached!';
+            remainingEl.innerHTML = '<span class="text-danger fs-6 fw-bold">THIS IS YOUR LAST WARNING. Switching tabs one more time will permanently expel you from this examination platform!</span>';
+        }
+
+        tabWarningModal.show();
+        document.getElementById('proctorAlertMsg').innerHTML = `<span class="text-danger fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i>Warning ${warningCount}/3 Triggered</span>`;
+    }
+
+    function dismissTabWarning() {
+        tabWarningModal.hide();
+        enterFullscreen();
+    }
+
+    // Browser focus and visibility listeners
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden && !isExamSubmitted) {
+            handleTabSwitch('TAB_SWITCH', 'Student switched browser tab or minimized window');
+        }
+    });
+
+    window.addEventListener('blur', function() {
+        if (!isExamSubmitted) {
+            handleTabSwitch('TAB_SWITCH', 'Student moved focus away from examination window');
+        }
+    });
+
+    // Anti-Cheat Restrictions
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('copy', e => e.preventDefault());
+    document.addEventListener('paste', e => e.preventDefault());
+    document.addEventListener('cut', e => e.preventDefault());
+
+    // 5. Countdown Timer
     function updateTimer() {
-        if (remainingSeconds <= 0) {
+        if (remainingSeconds <= 0 && !isExamSubmitted) {
+            isExamSubmitted = true;
             document.getElementById('timerDisplay').innerText = "00:00";
             alert("Examination time has expired. Submitting your answers automatically.");
             window.location.href = "{% url 'submit_exam' session_id=session.id %}";
@@ -177,7 +432,7 @@
     setInterval(updateTimer, 1000);
     updateTimer();
 
-    // 2. Render Question
+    // 6. Render Question
     function renderQuestion(index) {
         currentIndex = index;
         const q = questions[index];
@@ -225,7 +480,7 @@
         renderPalette();
     }
 
-    // 3. Select Option & Auto-Save
+    // 7. Select Option & Auto-Save
     function selectOption(qId, letter) {
         studentAnswers[qId] = letter;
         renderQuestion(currentIndex);
@@ -246,7 +501,6 @@
         autoSave(qId, studentAnswers[qId]);
     }
 
-    // 4. Auto-Save via AJAX API
     function autoSave(qId, optionLetter) {
         const indicator = document.getElementById('autoSaveIndicator');
         indicator.innerHTML = '<i class="bi bi-arrow-repeat spin text-primary me-1"></i>Saving...';
@@ -272,7 +526,7 @@
         });
     }
 
-    // 5. Palette Rendering
+    // 8. Palette Rendering
     function renderPalette() {
         const palette = document.getElementById('questionPalette');
         palette.innerHTML = '';
@@ -327,7 +581,7 @@
         modal.show();
     }
 
-    // 6. AI Webcam & Integrity Telemetry
+    // 9. AI Webcam Stream
     const video = document.getElementById('proctorWebcam');
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ video: true })
@@ -344,16 +598,18 @@
                 event_type: type,
                 details: details
             })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.is_terminated && !isExamSubmitted) {
+                isExamSubmitted = true;
+                expelledModal.show();
+                setTimeout(function() {
+                    window.location.href = "{% url 'submit_exam' session_id=session.id %}?reason=tab_switch_violation";
+                }, 2000);
+            }
         });
     }
-
-    // Browser Security Monitoring
-    document.addEventListener('visibilitychange', function() {
-        if (document.hidden) {
-            logProctoringEvent('TAB_SWITCH', 'Student switched browser tab or minimized window');
-            document.getElementById('proctorAlertMsg').innerHTML = '<span class="text-danger fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i>Tab switch recorded!</span>';
-        }
-    });
 
     // Initial render
     renderQuestion(0);

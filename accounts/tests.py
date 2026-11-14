@@ -173,3 +173,57 @@ class PortalEndToEndIntegrationTests(TestCase):
         self.assertContains(res, "POONAMALLEE")
         self.assertContains(res, "Developed By <strong>SARATHY &amp; THIRUMAL</strong>")
         self.assertContains(res, "2026 PUMO TECHNOVATION. All Rights Reserved.")
+
+    def test_tab_switch_warnings_and_expulsion(self):
+        """Test that switching tabs logs warnings and exceeding 3 terminates/expels the student."""
+        self.client.login(username='student_test', password='Password123!')
+
+        # Enter exam room
+        room_res = self.client.get(reverse('take_exam', kwargs={'exam_id': self.exam.id}))
+        self.assertEqual(room_res.status_code, 200)
+
+        session = ExamSession.objects.get(exam=self.exam, student=self.student)
+        self.assertEqual(session.tab_switch_count, 0)
+
+        # Tab switch 1, 2, 3 (Warnings 1 to 3)
+        for i in range(1, 4):
+            log_res = self.client.post(
+                reverse('proctoring_event_api'),
+                data=json.dumps({
+                    'session_id': session.id,
+                    'event_type': 'TAB_SWITCH',
+                    'details': f'Tab switch warning {i}'
+                }),
+                content_type='application/json'
+            )
+            self.assertEqual(log_res.status_code, 200)
+            data = log_res.json()
+            self.assertEqual(data['tab_switch_count'], i)
+            self.assertFalse(data['is_terminated'])
+
+        # 4th Tab Switch (Exceeds 3 warnings -> Expelled)
+        log_res_4 = self.client.post(
+            reverse('proctoring_event_api'),
+            data=json.dumps({
+                'session_id': session.id,
+                'event_type': 'TAB_SWITCH',
+                'details': 'Tab switch violation 4 (Exceeded 3 warnings)'
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(log_res_4.status_code, 200)
+        data_4 = log_res_4.json()
+        self.assertEqual(data_4['tab_switch_count'], 4)
+        self.assertTrue(data_4['is_terminated'])
+
+        # Auto submit via termination URL
+        submit_res = self.client.get(reverse('submit_exam', kwargs={'session_id': session.id}) + '?reason=tab_switch_violation')
+        self.assertRedirects(submit_res, reverse('student_results'))
+
+        # Verify Result record notes termination
+        result = Result.objects.get(exam=self.exam, student=self.student)
+        self.assertIn("Terminated due to multiple tab switch violations", result.trainer_feedback)
+
+        # Student cannot re-enter exam room
+        re_enter_res = self.client.get(reverse('take_exam', kwargs={'exam_id': self.exam.id}))
+        self.assertRedirects(re_enter_res, reverse('student_results'))
