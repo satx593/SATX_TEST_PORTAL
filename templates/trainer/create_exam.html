@@ -1,0 +1,144 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Create Examination - PUMO Technovation{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold text-primary mb-1">Create Examination</h3>
+            <p class="text-muted mb-0">Configure test parameters, schedule window, assign questions, and enable AI proctoring.</p>
+        </div>
+        <a href="{% url 'trainer_dashboard' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back</a>
+    </div>
+
+    <form method="POST">
+        {% csrf_token %}
+        <div class="row g-4">
+            <!-- Left Column: Settings -->
+            <div class="col-lg-5">
+                <div class="card card-pumo mb-4">
+                    <div class="card-header card-header-pumo">
+                        <i class="bi bi-gear-fill me-2 text-primary"></i>Exam Parameters
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Exam Title</label>
+                            <input type="text" class="form-control" name="title" placeholder="e.g. Python Full Stack Assessment 1" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Description / Syllabus</label>
+                            <textarea class="form-control" name="description" rows="2" placeholder="Instructions..."></textarea>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Course</label>
+                                <select name="course" class="form-select" required>
+                                    {% for c in courses %}
+                                    <option value="{{ c.id }}">{{ c.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Target Batch</label>
+                                <select name="batch" class="form-select">
+                                    <option value="">-- All Candidates --</option>
+                                    {% for b in batches %}
+                                    <option value="{{ b.id }}">{{ b.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-4">
+                                <label class="form-label small fw-semibold">Exam Type</label>
+                                <select name="exam_type" class="form-select">
+                                    <option value="MCQ">MCQ</option>
+                                    <option value="CODING">Coding</option>
+                                    <option value="PRACTICAL">Practical</option>
+                                </select>
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label small fw-semibold">Duration (Mins)</label>
+                                <input type="number" class="form-control" name="duration_minutes" value="30" min="5" required>
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label small fw-semibold">Pass Marks</label>
+                                <input type="number" class="form-control" name="pass_marks" value="20" min="1" required>
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Start Window</label>
+                                <input type="datetime-local" class="form-control" name="start_time" required id="startTime">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">End Window</label>
+                                <input type="datetime-local" class="form-control" name="end_time" required id="endTime">
+                            </div>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="proctoringSwitch" name="is_proctored" checked>
+                            <label class="form-check-label fw-semibold" for="proctoringSwitch">
+                                <i class="bi bi-camera-video-fill text-danger me-1"></i>Enable AI Webcam Proctoring
+                            </label>
+                            <div class="form-text small">Monitors candidate face presence, tab switching, and fullscreen status.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Question Selection -->
+            <div class="col-lg-7">
+                <div class="card card-pumo mb-4">
+                    <div class="card-header card-header-pumo d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-check2-square me-2 text-primary"></i>Select Questions from Question Bank</span>
+                        <span class="badge bg-light text-primary border" id="selectedCountBadge">0 Selected</span>
+                    </div>
+                    <div class="card-body p-0" style="max-height: 520px; overflow-y: auto;">
+                        <ul class="list-group list-group-flush">
+                            {% for q in questions %}
+                            <li class="list-group-item px-3 py-2">
+                                <div class="form-check">
+                                    <input class="form-check-input q-checkbox" type="checkbox" name="selected_questions" value="{{ q.id }}" id="q_{{ q.id }}" onchange="updateSelectedCount()">
+                                    <label class="form-check-label w-100" for="q_{{ q.id }}">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="fw-semibold text-primary">{{ q.question_text }}</div>
+                                            <span class="badge bg-light text-dark border ms-2">{{ q.marks }} Marks</span>
+                                        </div>
+                                        <small class="text-muted">
+                                            Type: {{ q.get_question_type_display }} &bull; Topic: {{ q.topic }} &bull; Difficulty: {{ q.difficulty }}
+                                        </small>
+                                    </label>
+                                </div>
+                            </li>
+                            {% empty %}
+                            <li class="list-group-item text-center text-muted py-4">No approved questions found in the Question Bank.</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-pumo w-100 py-3 fs-5 shadow">
+                    <i class="bi bi-send-fill me-2"></i>Publish &amp; Schedule Examination
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Set default start/end dates
+    const now = new Date();
+    const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    document.getElementById('startTime').value = now.toISOString().slice(0, 16);
+    document.getElementById('endTime').value = nextWeek.toISOString().slice(0, 16);
+
+    function updateSelectedCount() {
+        const checked = document.querySelectorAll('.q-checkbox:checked').length;
+        document.getElementById('selectedCountBadge').innerText = checked + ' Selected';
+    }
+</script>
+{% endblock %}

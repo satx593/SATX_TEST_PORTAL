@@ -1,0 +1,51 @@
+{% extends 'base/base.html' %}
+
+{% block title %}My Profile - PUMO Technovation{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-7">
+            <div class="card card-pumo shadow-sm">
+                <div class="card-header card-header-pumo">
+                    <i class="bi bi-person-circle me-2 text-primary"></i>User Profile Details
+                </div>
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center gap-3 mb-4">
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fs-2 fw-bold" style="width: 64px; height: 64px;">
+                            {{ user.username|first|upper }}
+                        </div>
+                        <div>
+                            <h4 class="fw-bold mb-0 text-primary">{{ user.get_full_name|default:user.username }}</h4>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">{{ user.get_role_display }}</span>
+                        </div>
+                    </div>
+
+                    <table class="table table-borderless">
+                        <tr>
+                            <td class="text-muted fw-semibold" style="width: 35%;">Username</td>
+                            <td>{{ user.username }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted fw-semibold">Email Address</td>
+                            <td>{{ user.email|default:"Not specified" }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted fw-semibold">Branch Location</td>
+                            <td>POONAMALLEE</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted fw-semibold">Account Status</td>
+                            <td><span class="badge bg-success-subtle text-success">Active</span></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted fw-semibold">Joined Date</td>
+                            <td>{{ user.date_joined|date:"M d, Y" }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

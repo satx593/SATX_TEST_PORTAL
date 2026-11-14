@@ -1,0 +1,115 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Student Portal - PUMO Technovation{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold text-primary mb-1">Student Examination Portal</h3>
+            <p class="text-muted mb-0">Welcome, <strong>{{ user.get_full_name|default:user.username }}</strong> ({{ user.student_profile.reg_no|default:"Candidate" }}).</p>
+        </div>
+        <div>
+            <span class="badge bg-primary px-3 py-2"><i class="bi bi-mortarboard-fill me-1"></i>Poonamallee Candidate</span>
+        </div>
+    </div>
+
+    <!-- Assigned Examinations -->
+    <div class="card card-pumo mb-4">
+        <div class="card-header card-header-pumo d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-pencil-square me-2 text-primary"></i>Assigned Examinations</span>
+            <span class="badge bg-light text-primary border">{{ assignments.count }} Assigned</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Exam Title</th>
+                            <th>Course</th>
+                            <th>Type</th>
+                            <th>Duration</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in assignments %}
+                        <tr>
+                            <td class="fw-semibold text-primary">{{ a.exam.title }}</td>
+                            <td>{{ a.exam.course.name }}</td>
+                            <td><span class="badge bg-secondary">{{ a.exam.get_exam_type_display }}</span></td>
+                            <td>{{ a.exam.duration_minutes }} Mins</td>
+                            <td>
+                                {% if a.status == 'COMPLETED' %}
+                                    <span class="badge bg-success">Completed</span>
+                                {% elif a.status == 'IN_PROGRESS' %}
+                                    <span class="badge bg-warning text-dark">In Progress</span>
+                                {% else %}
+                                    <span class="badge bg-primary">Ready to Attend</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if a.status == 'COMPLETED' %}
+                                    <a href="{% url 'student_results' %}" class="btn btn-sm btn-outline-success">
+                                        <i class="bi bi-award me-1"></i>View Score
+                                    </a>
+                                {% else %}
+                                    <a href="{% url 'exam_instructions' exam_id=a.exam.id %}" class="btn btn-sm btn-pumo">
+                                        <i class="bi bi-box-arrow-in-right me-1"></i>Start Exam
+                                    </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">No examinations assigned to your account right now.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Personal Completed Results -->
+    {% if completed_results %}
+    <div class="card card-pumo">
+        <div class="card-header card-header-pumo">
+            <i class="bi bi-trophy-fill me-2 text-warning"></i>Recent Published Scores
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Exam Name</th>
+                            <th>Score Obtained</th>
+                            <th>Percentage</th>
+                            <th>Result Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in completed_results %}
+                        <tr>
+                            <td class="fw-semibold">{{ r.exam.title }}</td>
+                            <td class="fw-bold text-primary">{{ r.score }} / {{ r.exam.total_marks }}</td>
+                            <td>{{ r.percentage }}%</td>
+                            <td>
+                                {% if r.is_passed %}
+                                    <span class="badge bg-success">Passed</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Needs Improvement</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

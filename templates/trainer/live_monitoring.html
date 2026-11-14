@@ -1,0 +1,118 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Live Exam Monitoring &amp; AI Proctoring Alerts - PUMO Technovation{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold text-primary mb-1">Live Exam Monitoring &amp; AI Proctoring Alerts</h3>
+            <p class="text-muted mb-0">Real-time candidate telemetry, integrity monitoring, and browser event logs.</p>
+        </div>
+        <button type="button" class="btn btn-outline-primary" onclick="window.location.reload()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Refresh Feed
+        </button>
+    </div>
+
+    <!-- Active Sessions -->
+    <div class="card card-pumo mb-4">
+        <div class="card-header card-header-pumo d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-broadcast me-2 text-danger"></i>Active Student Exam Sessions</span>
+            <span class="badge bg-danger">{{ active_sessions.count }} In Progress</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Student</th>
+                            <th>Examination</th>
+                            <th>Session Started</th>
+                            <th>Tab Switches</th>
+                            <th>Face Absences</th>
+                            <th>Multiple Faces</th>
+                            <th>IP Address</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in active_sessions %}
+                        <tr>
+                            <td class="fw-semibold">{{ s.student.get_full_name|default:s.student.username }}</td>
+                            <td>{{ s.exam.title }}</td>
+                            <td>{{ s.start_time|date:"H:i:s" }}</td>
+                            <td>
+                                <span class="badge {% if s.tab_switch_count > 0 %}bg-danger{% else %}bg-light text-muted border{% endif %}">
+                                    {{ s.tab_switch_count }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge {% if s.face_absence_count > 0 %}bg-warning text-dark{% else %}bg-light text-muted border{% endif %}">
+                                    {{ s.face_absence_count }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge {% if s.multi_face_count > 0 %}bg-danger{% else %}bg-light text-muted border{% endif %}">
+                                    {{ s.multi_face_count }}
+                                </span>
+                            </td>
+                            <td><small class="text-muted">{{ s.ip_address|default:"127.0.0.1" }}</small></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4 text-muted">No student sessions currently active.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Proctoring Events Stream -->
+    <div class="card card-pumo">
+        <div class="card-header card-header-pumo">
+            <i class="bi bi-shield-exclamation me-2 text-warning"></i>AI Proctoring Alert Telemetry
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Time</th>
+                            <th>Student</th>
+                            <th>Exam</th>
+                            <th>Alert Type</th>
+                            <th>Severity</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for event in proctoring_alerts %}
+                        <tr>
+                            <td><small class="text-muted">{{ event.timestamp|date:"H:i:s" }}</small></td>
+                            <td class="fw-semibold">{{ event.session.student.get_full_name|default:event.session.student.username }}</td>
+                            <td><small>{{ event.session.exam.title }}</small></td>
+                            <td>
+                                <span class="badge bg-{% if event.event_type == 'MULTIPLE_FACES' %}danger{% elif event.event_type == 'FACE_ABSENT' %}warning text-dark{% elif event.event_type == 'TAB_SWITCH' %}danger{% else %}secondary{% endif %}">
+                                    {{ event.get_event_type_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge {% if event.severity == 'HIGH' %}bg-danger-subtle text-danger border border-danger-subtle{% elif event.severity == 'MEDIUM' %}bg-warning-subtle text-warning border border-warning-subtle{% else %}bg-info-subtle text-info{% endif %}">
+                                    {{ event.severity }}
+                                </span>
+                            </td>
+                            <td><small>{{ event.details|default:"-" }}</small></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-muted">No suspicious events or proctoring alerts recorded.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

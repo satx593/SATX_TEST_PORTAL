@@ -1,0 +1,69 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Examination Instructions - PUMO Technovation{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <div class="card card-pumo shadow-sm">
+                <div class="card-header card-header-pumo d-flex justify-content-between align-items-center">
+                    <span class="fs-5 fw-bold text-primary"><i class="bi bi-shield-check me-2"></i>{{ exam.title }}</span>
+                    <span class="badge bg-primary fs-6">{{ exam.duration_minutes }} Minutes</span>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-7">
+                            <h5 class="fw-bold text-primary mb-3">Important Assessment Guidelines</h5>
+                            <ul class="list-unstyled d-flex flex-column gap-2 text-secondary">
+                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>Total Marks: <strong>{{ exam.total_marks }}</strong> (Pass Marks: <strong>{{ exam.pass_marks }}</strong>)</li>
+                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>Duration: <strong>{{ exam.duration_minutes }} Minutes</strong> controlled by server countdown timer.</li>
+                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>Answers are <strong>auto-saved instantly</strong> upon selecting an option.</li>
+                                <li><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i><strong>Do not switch browser tabs</strong> or exit fullscreen mode. Violations are logged.</li>
+                                <li><i class="bi bi-camera-video-fill text-primary me-2"></i>Ensure your webcam is enabled and your face is clearly visible throughout the exam.</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-5 text-center">
+                            <div class="border rounded p-3 bg-light">
+                                <h6 class="fw-bold text-primary mb-2"><i class="bi bi-camera-video me-1"></i>Webcam Check</h6>
+                                <video id="instructionWebcam" autoplay playsinline muted class="webcam-preview mb-2 shadow-sm" style="width: 100%; height: 160px;"></video>
+                                <div id="webcamStatus" class="small text-muted">Checking camera access...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                        <a href="{% url 'student_dashboard' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+                        </a>
+                        <a href="{% url 'take_exam' exam_id=exam.id %}" class="btn btn-pumo px-4 py-2 fs-6 shadow" id="startExamBtn">
+                            <i class="bi bi-play-circle-fill me-2"></i>Start Examination Now
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Webcam stream test
+    const video = document.getElementById('instructionWebcam');
+    const statusText = document.getElementById('webcamStatus');
+
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(function(stream) {
+                video.srcObject = stream;
+                statusText.innerHTML = '<span class="text-success fw-bold"><i class="bi bi-check2-circle me-1"></i>Webcam verified &amp; ready</span>';
+            })
+            .catch(function(err) {
+                statusText.innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>Camera permission required</span>';
+            });
+    } else {
+        statusText.innerHTML = '<span class="text-warning">Webcam not supported by browser</span>';
+    }
+</script>
+{% endblock %}
