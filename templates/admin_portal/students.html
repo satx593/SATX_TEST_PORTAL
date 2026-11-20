@@ -1,13 +1,13 @@
 {% extends 'base/base.html' %}
 
-{% block title %}Manage Students - PUMO Technovation{% endblock %}
+{% block title %}Student Management - SATX{% endblock %}
 
 {% block content %}
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h3 class="fw-bold text-primary mb-1">Student Management</h3>
-            <p class="text-muted mb-0">Enrolled candidates, registration IDs, course, and batch assignments.</p>
+            <p class="text-muted mb-0">Enrolled candidates, registration IDs, course, batch assignments, and credential dispatch.</p>
         </div>
         <div class="d-flex gap-2">
             <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#bulkUploadModal">
@@ -19,8 +19,56 @@
         </div>
     </div>
 
+    <!-- Student Count Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-md-3">
+            <div class="card card-pumo stat-card p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small text-uppercase fw-semibold">Total Students</div>
+                        <h3 class="fw-bold mb-0 text-primary">{{ total_student_count }}</h3>
+                    </div>
+                    <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <div class="card card-pumo stat-card p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small text-uppercase fw-semibold">Active Students</div>
+                        <h3 class="fw-bold mb-0 text-success">{{ active_student_count }}</h3>
+                    </div>
+                    <div class="stat-icon text-success"><i class="bi bi-person-check-fill"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <div class="card card-pumo stat-card p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small text-uppercase fw-semibold">Inactive Accounts</div>
+                        <h3 class="fw-bold mb-0 text-secondary">{{ inactive_student_count }}</h3>
+                    </div>
+                    <div class="stat-icon text-secondary"><i class="bi bi-person-x-fill"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <div class="card card-pumo stat-card p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small text-uppercase fw-semibold">Filtered View</div>
+                        <h3 class="fw-bold mb-0 text-info">{{ students.count }}</h3>
+                    </div>
+                    <div class="stat-icon text-info"><i class="bi bi-funnel-fill"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Search & Filter Bar -->
-    <div class="card card-pumo mb-4">
+    <div class="card card-pumo mb-3">
         <div class="card-body p-3">
             <form method="GET" class="row g-2 align-items-center">
                 <div class="col-md-6">
@@ -44,24 +92,54 @@
         </div>
     </div>
 
+    <!-- Bulk Actions Bar (shown when rows selected) -->
+    <div id="bulkActionBar" class="card card-pumo mb-3 border-warning d-none">
+        <div class="card-body py-2 d-flex align-items-center gap-3">
+            <span class="fw-semibold text-warning"><i class="bi bi-check2-square me-1"></i><span id="selectedCount">0</span> student(s) selected</span>
+            <form method="POST" id="bulkDeactivateForm" onsubmit="return confirmBulkAction('deactivate')">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="bulk_deactivate">
+                <div id="bulkDeactivateIds"></div>
+                <button type="submit" class="btn btn-sm btn-warning"><i class="bi bi-person-dash me-1"></i>Deactivate Selected</button>
+            </form>
+            <form method="POST" id="bulkDeleteForm" onsubmit="return confirmBulkAction('delete')">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="bulk_delete_students">
+                <div id="bulkDeleteIds"></div>
+                <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash me-1"></i>Delete Selected</button>
+            </form>
+            <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" onclick="clearAllSelections()">
+                <i class="bi bi-x-circle me-1"></i>Clear Selection
+            </button>
+        </div>
+    </div>
+
     <!-- Students Table -->
-    <div class="card card-pumo">
+    <div class="card card-pumo shadow-sm">
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>
+                            <th style="width: 44px;">
+                                <input type="checkbox" class="form-check-input" id="selectAllStudents" title="Select All" onchange="toggleSelectAll(this)">
+                            </th>
                             <th>Student</th>
                             <th>Reg. No</th>
                             <th>Course</th>
                             <th>Assigned Batch</th>
+                            <th>Exams Attended</th>
                             <th>Email</th>
                             <th>Status</th>
+                            <th class="text-end pe-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for student in students %}
                         <tr>
+                            <td>
+                                <input type="checkbox" class="form-check-input student-cb" value="{{ student.id }}" onchange="updateBulkBar()">
+                            </td>
                             <td>
                                 <div class="d-flex align-items-center gap-2">
                                     <div class="rounded-circle bg-info bg-opacity-10 text-info d-flex align-items-center justify-content-center fw-bold" style="width: 36px; height: 36px;">
@@ -76,6 +154,15 @@
                             <td><span class="badge bg-light text-primary border">{{ student.student_profile.reg_no|default:"N/A" }}</span></td>
                             <td>{{ student.student_profile.course.name|default:"Unassigned" }}</td>
                             <td>{{ student.student_profile.batch.name|default:"Unassigned" }}</td>
+                            <td>
+                                {% with attended=student.exam_sessions.count %}
+                                {% if attended %}
+                                    <span class="badge bg-primary">{{ attended }} exam{{ attended|pluralize }}</span>
+                                {% else %}
+                                    <span class="text-muted small">None yet</span>
+                                {% endif %}
+                                {% endwith %}
+                            </td>
                             <td>{{ student.email|default:"-" }}</td>
                             <td>
                                 {% if student.is_active %}
@@ -84,10 +171,96 @@
                                     <span class="badge bg-danger-subtle text-danger">Inactive</span>
                                 {% endif %}
                             </td>
+                            <td class="text-end pe-3">
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editStudentModal{{ student.id }}" title="Edit Student Data">
+                                    <i class="bi bi-pencil-square me-1"></i>Edit
+                                </button>
+                            </td>
                         </tr>
+
+                        <!-- Modal: Edit Student {{ student.id }} -->
+                        <div class="modal fade text-start" id="editStudentModal{{ student.id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-lg">
+                                <div class="modal-content">
+                                    <form method="POST">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="edit">
+                                        <input type="hidden" name="student_id" value="{{ student.id }}">
+                                        <div class="modal-header bg-primary text-white">
+                                            <h5 class="modal-title fw-bold">
+                                                <i class="bi bi-pencil-square me-2"></i>Edit Student: {{ student.get_full_name|default:student.username }}
+                                            </h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body p-4">
+                                            <div class="row g-3">
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold">First Name *</label>
+                                                    <input type="text" class="form-control" name="first_name" value="{{ student.first_name }}" required>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold">Last Name</label>
+                                                    <input type="text" class="form-control" name="last_name" value="{{ student.last_name }}">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold">Username</label>
+                                                    <input type="text" class="form-control bg-light" value="{{ student.username }}" disabled readonly>
+                                                    <small class="text-muted">Username cannot be changed.</small>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold">Registration No *</label>
+                                                    <input type="text" class="form-control" name="reg_no" value="{{ student.student_profile.reg_no|default:'' }}" required>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold">Email Address</label>
+                                                    <input type="email" class="form-control" name="email" value="{{ student.email|default:'' }}">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold">Account Status</label>
+                                                    <select name="is_active" class="form-select">
+                                                        <option value="ACTIVE" {% if student.is_active %}selected{% endif %}>Active</option>
+                                                        <option value="INACTIVE" {% if not student.is_active %}selected{% endif %}>Inactive / Deactivated</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold">Assigned Course</label>
+                                                    <select name="course" class="form-select">
+                                                        <option value="">-- Unassigned --</option>
+                                                        {% for c in courses %}
+                                                        <option value="{{ c.id }}" {% if student.student_profile.course_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold">Assigned Batch</label>
+                                                    <select name="batch" class="form-select">
+                                                        <option value="">-- Unassigned --</option>
+                                                        {% for b in batches %}
+                                                        <option value="{{ b.id }}" {% if student.student_profile.batch_id == b.id %}selected{% endif %}>{{ b.name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label small fw-semibold">Reset Password</label>
+                                                    <input type="password" class="form-control" name="password" placeholder="Leave blank to keep existing password">
+                                                    <small class="text-muted d-block">Only enter a new password if you want to reset this student's login credentials.</small>
+                                                    <small class="text-info d-block mt-1"><i class="bi bi-envelope-check me-1"></i>If changed and the student has an email address, new credentials will be emailed to them automatically.</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer bg-light">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="submit" class="btn btn-pumo">
+                                                <i class="bi bi-check2-circle me-1"></i>Save Changes
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center py-4 text-muted">No students found matching current filter criteria.</td>
+                            <td colspan="9" class="text-center py-4 text-muted">No students found matching current filter criteria.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -111,7 +284,7 @@
                 <div class="modal-body">
                     <div class="row g-2 mb-3">
                         <div class="col-6">
-                            <label class="form-label small fw-semibold">First Name</label>
+                            <label class="form-label small fw-semibold">First Name *</label>
                             <input type="text" class="form-control" name="first_name" required>
                         </div>
                         <div class="col-6">
@@ -121,21 +294,23 @@
                     </div>
                     <div class="row g-2 mb-3">
                         <div class="col-6">
-                            <label class="form-label small fw-semibold">Username</label>
+                            <label class="form-label small fw-semibold">Username *</label>
                             <input type="text" class="form-control" name="username" required>
                         </div>
                         <div class="col-6">
-                            <label class="form-label small fw-semibold">Registration Number</label>
-                            <input type="text" class="form-control" name="reg_no" placeholder="PUMO2026..." required>
+                            <label class="form-label small fw-semibold">Registration Number *</label>
+                            <input type="text" class="form-control" name="reg_no" placeholder="SATX2026..." required>
                         </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">Email Address</label>
-                        <input type="email" class="form-control" name="email">
+                        <input type="email" class="form-control" name="email" placeholder="student@example.com">
+                        <small class="text-info d-block mt-1"><i class="bi bi-envelope-check me-1"></i>Account credentials (username and password) will be automatically emailed to this address upon enrollment.</small>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold">Password</label>
+                        <label class="form-label small fw-semibold">Initial Password *</label>
                         <input type="password" class="form-control" name="password" required value="Student@123">
+                        <small class="text-muted">Default is Student@123. Can be customized before creation.</small>
                     </div>
                     <div class="row g-2 mb-3">
                         <div class="col-6">
@@ -160,7 +335,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-pumo">Enroll Student</button>
+                    <button type="submit" class="btn btn-pumo"><i class="bi bi-person-plus-fill me-1"></i>Enroll &amp; Send Credentials</button>
                 </div>
             </form>
         </div>
@@ -186,14 +361,68 @@
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">Select CSV File</label>
                         <input type="file" class="form-control" name="csv_file" accept=".csv" required>
+                        <small class="text-info d-block mt-2"><i class="bi bi-envelope-paper me-1"></i>Any candidate row that includes an email address will automatically receive a welcome email with their login credentials.</small>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Start Import</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-cloud-arrow-up-fill me-1"></i>Start Import &amp; Emailing</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleSelectAll(masterCb) {
+    document.querySelectorAll('.student-cb').forEach(cb => cb.checked = masterCb.checked);
+    updateBulkBar();
+}
+
+function clearAllSelections() {
+    document.querySelectorAll('.student-cb').forEach(cb => cb.checked = false);
+    document.getElementById('selectAllStudents').checked = false;
+    updateBulkBar();
+}
+
+function updateBulkBar() {
+    const checked = document.querySelectorAll('.student-cb:checked');
+    const bar = document.getElementById('bulkActionBar');
+    document.getElementById('selectedCount').innerText = checked.length;
+
+    // Sync master checkbox
+    const all = document.querySelectorAll('.student-cb');
+    const master = document.getElementById('selectAllStudents');
+    master.checked = all.length > 0 && checked.length === all.length;
+    master.indeterminate = checked.length > 0 && checked.length < all.length;
+
+    if (checked.length > 0) {
+        bar.classList.remove('d-none');
+        // Populate hidden ID inputs for both forms
+        ['bulkDeactivateIds', 'bulkDeleteIds'].forEach(divId => {
+            const container = document.getElementById(divId);
+            container.innerHTML = '';
+            checked.forEach(cb => {
+                const inp = document.createElement('input');
+                inp.type = 'hidden';
+                inp.name = 'student_ids';
+                inp.value = cb.value;
+                container.appendChild(inp);
+            });
+        });
+    } else {
+        bar.classList.add('d-none');
+    }
+}
+
+function confirmBulkAction(type) {
+    const count = document.querySelectorAll('.student-cb:checked').length;
+    if (type === 'delete') {
+        return confirm(`Permanently DELETE ${count} student account(s)? This cannot be undone.`);
+    }
+    return confirm(`Deactivate ${count} student account(s)?`);
+}
+</script>
 {% endblock %}

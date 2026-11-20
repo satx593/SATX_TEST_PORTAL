@@ -50,7 +50,7 @@ def extract_questions_from_pdf(pdf_path):
                 'text': q_text,
                 'options': {},
                 'correct_answer': None,
-                'marks': 2
+                'marks': 1
             }
         elif ans_match and current_q:
             current_q['correct_answer'] = ans_match.group(1).upper()
@@ -68,5 +68,13 @@ def extract_questions_from_pdf(pdf_path):
 
     if current_q and current_q.get('text') and current_q.get('options'):
         extracted_questions.append(current_q)
+
+    # Sort questions by extracted number to strictly preserve PDF question order
+    try:
+        extracted_questions.sort(
+            key=lambda x: int(x.get('number', 0)) if str(x.get('number', '')).isdigit() else 999999
+        )
+    except Exception:
+        pass
 
     return extracted_questions, None

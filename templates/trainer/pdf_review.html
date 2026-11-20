@@ -1,22 +1,29 @@
 {% extends 'base/base.html' %}
 
-{% block title %}Review Extracted PDF Questions - PUMO Technovation{% endblock %}
+{% block title %}Review Extracted PDF Questions - SATX{% endblock %}
 
 {% block content %}
 <div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <div>
             <h3 class="fw-bold text-primary mb-1">Extracted PDF Questions - Review &amp; Approval</h3>
-            <p class="text-muted mb-0">Trainer verification is mandatory. Review options, verify the correct answer, and approve questions into the Question Bank.</p>
+            <p class="text-muted mb-0">Trainer verification is mandatory. Review options, verify the correct answer, approve questions into the Question Bank, or discard unwanted questions.</p>
         </div>
-        <div class="d-flex gap-2">
-            <a href="{% url 'question_bank' %}" class="btn btn-outline-secondary"><i class="bi bi-x-circle me-1"></i>Cancel</a>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'question_bank' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to Question Bank</a>
             {% if pending_questions %}
             <form method="POST" class="d-inline">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="approve_all">
                 <button type="submit" class="btn btn-success shadow-sm" onclick="return confirm('Approve all pending questions into the Question Bank?')">
                     <i class="bi bi-check-all me-1"></i>Approve All Questions
+                </button>
+            </form>
+            <form method="POST" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_all">
+                <button type="submit" class="btn btn-outline-danger shadow-sm" onclick="return confirm('Cancel and permanently DELETE all pending questions from this approval space?')">
+                    <i class="bi bi-trash3 me-1"></i>Discard All Pending
                 </button>
             </form>
             {% endif %}
@@ -27,8 +34,8 @@
     <div class="card card-pumo text-center py-5">
         <div class="card-body">
             <i class="bi bi-patch-check-fill text-success fs-1 mb-2"></i>
-            <h4 class="fw-bold">All Questions Approved!</h4>
-            <p class="text-muted">There are no pending questions awaiting approval from this PDF import.</p>
+            <h4 class="fw-bold">No Questions Pending Approval</h4>
+            <p class="text-muted">All extracted questions have either been approved into the Question Bank or discarded.</p>
             <a href="{% url 'question_bank' %}" class="btn btn-pumo mt-2"><i class="bi bi-database me-1"></i>Go to Question Bank</a>
         </div>
     </div>
@@ -37,42 +44,55 @@
     <div class="row g-4">
         {% for q in pending_questions %}
         <div class="col-12">
-            <div class="card card-pumo border-start border-4 border-warning">
+            <div class="card card-pumo border-start border-4 border-warning shadow-sm">
                 <div class="card-body p-4">
-                    <form method="POST">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-primary px-3 py-2 fs-6 shadow-sm"><i class="bi bi-patch-question-fill me-1"></i>Question {{ forloop.counter }}</span>
+                            <span class="badge bg-warning text-dark px-2 py-1"><i class="bi bi-hourglass-split me-1"></i>Pending Review</span>
+                        </div>
+                        <span class="badge bg-light text-muted border">Extracted from PDF</span>
+                    </div>
+
+                    <form method="POST" id="formQ{{ q.id }}">
                         {% csrf_token %}
-                        <input type="hidden" name="action" value="approve_single">
                         <input type="hidden" name="question_id" value="{{ q.id }}">
 
-                        <div class="d-flex justify-content-between align-items-start mb-3">
-                            <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split me-1"></i>Awaiting Approval #{{ q.id }}</span>
-                            <span class="badge bg-light text-muted border">Extracted from PDF</span>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Question Text (Editable)</label>
+                            <textarea class="form-control" name="question_text" rows="2" placeholder="Edit question text if needed...">{{ q.question_text }}</textarea>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label small fw-semibold">Question Text</label>
-                            <textarea class="form-control" name="question_text" rows="2" readonly>{{ q.question_text }}</textarea>
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold text-secondary">
+                                <i class="bi bi-pencil-square me-1"></i>Options (Select radio for correct answer &amp; edit text directly if needed):
+                            </label>
                         </div>
 
                         <div class="row g-2 mb-3">
                             {% for opt in q.options.all %}
                             <div class="col-md-6">
                                 <div class="input-group">
-                                    <div class="input-group-text">
+                                    <div class="input-group-text bg-white">
                                         <input class="form-check-input mt-0" type="radio" name="correct_option" value="{{ opt.option_letter }}" {% if opt.is_correct %}checked{% endif %}>
-                                        <span class="ms-2 fw-bold">{{ opt.option_letter }}</span>
+                                        <span class="ms-2 fw-bold text-primary">{{ opt.option_letter }}</span>
                                     </div>
-                                    <input type="text" class="form-control" value="{{ opt.option_text }}" readonly>
+                                    <input type="text" class="form-control" name="option_{{ opt.option_letter|lower }}" value="{{ opt.option_text }}" placeholder="Edit option {{ opt.option_letter }} text...">
                                 </div>
                             </div>
                             {% endfor %}
                         </div>
 
-                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                            <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Select the radio button next to the correct answer.</small>
-                            <button type="submit" class="btn btn-sm btn-pumo">
-                                <i class="bi bi-check-circle me-1"></i>Approve Question
-                            </button>
+                        <div class="d-flex justify-content-between align-items-center pt-3 border-top flex-wrap gap-2">
+                            <small class="text-muted"><i class="bi bi-info-circle me-1"></i>You can edit any option above and select the correct radio button.</small>
+                            <div class="d-flex gap-2">
+                                <button type="submit" name="action" value="delete_single" class="btn btn-sm btn-outline-danger" onclick="return confirm('Cancel and permanently DELETE Question {{ forloop.counter }}?');">
+                                    <i class="bi bi-trash me-1"></i>Delete / Cancel
+                                </button>
+                                <button type="submit" name="action" value="approve_single" class="btn btn-sm btn-pumo">
+                                    <i class="bi bi-check-circle me-1"></i>Approve Question {{ forloop.counter }}
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>

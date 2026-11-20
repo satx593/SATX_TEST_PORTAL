@@ -8,6 +8,7 @@ class Question(models.Model):
     QUESTION_TYPES = (
         ('MCQ_SINGLE', 'Single Correct MCQ'),
         ('MCQ_MULTI', 'Multiple Select MCQ'),
+        ('THEORY', 'Theory Question'),
         ('CODING', 'Coding Problem'),
         ('PRACTICAL', 'Practical Task'),
     )
@@ -28,6 +29,9 @@ class Question(models.Model):
     is_approved = models.BooleanField(default=True, help_text="False for raw PDF-extracted questions awaiting trainer approval")
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # Theory specific fields
+    keywords = models.TextField(blank=True, help_text="Comma-separated keywords required in student's answer sentence")
+
     # Coding specific fields
     input_format = models.TextField(blank=True)
     output_format = models.TextField(blank=True)
@@ -44,10 +48,36 @@ class Question(models.Model):
 
     class Meta:
         db_table = 'portal_questions'
-        ordering = ['-created_at']
+        ordering = ['id']
 
     def __str__(self):
         return f"[{self.get_question_type_display()}] {self.question_text[:60]}"
+
+    def get_sample_test_cases(self):
+        """Return list of dicts [{'input': ..., 'output': ...}] for multiple sample test cases."""
+        inps = [p.strip() for p in (self.sample_input or '').split('---') if p.strip()]
+        outs = [p.strip() for p in (self.sample_output or '').split('---') if p.strip()]
+        count = max(len(inps), len(outs), 1)
+        cases = []
+        for i in range(count):
+            cases.append({
+                'input': inps[i] if i < len(inps) else '',
+                'output': outs[i] if i < len(outs) else ''
+            })
+        return cases
+
+    def get_hidden_test_cases(self):
+        """Return list of dicts [{'input': ..., 'output': ...}] for multiple hidden test cases."""
+        inps = [p.strip() for p in (self.hidden_input or '').split('---') if p.strip()]
+        outs = [p.strip() for p in (self.hidden_output or '').split('---') if p.strip()]
+        count = max(len(inps), len(outs), 1)
+        cases = []
+        for i in range(count):
+            cases.append({
+                'input': inps[i] if i < len(inps) else '',
+                'output': outs[i] if i < len(outs) else ''
+            })
+        return cases
 
 
 class QuestionOption(models.Model):
@@ -113,8 +143,8 @@ class Exam(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='DRAFT')
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_exams')
     is_proctored = models.BooleanField(default=True)
-    shuffle_questions = models.BooleanField(default=True)
-    shuffle_options = models.BooleanField(default=True)
+    shuffle_questions = models.BooleanField(default=False)
+    shuffle_options = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     questions = models.ManyToManyField(Question, through='ExamQuestion', related_name='exams')
@@ -135,7 +165,7 @@ class ExamQuestion(models.Model):
 
     class Meta:
         db_table = 'portal_exam_questions'
-        ordering = ['order']
+        ordering = ['order', 'id']
         unique_together = ('exam', 'question')
 
 
@@ -182,6 +212,7 @@ class StudentAnswer(models.Model):
     session = models.ForeignKey(ExamSession, on_delete=models.CASCADE, related_name='answers')
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
     selected_option_letter = models.CharField(max_length=5, blank=True)  # 'A', 'B', etc.
+    theory_answer = models.TextField(blank=True)
     submitted_code = models.TextField(blank=True)
     practical_file = models.FileField(upload_to='submissions/practical/', blank=True, null=True)
     is_marked_for_review = models.BooleanField(default=False)
@@ -233,6 +264,7 @@ class Result(models.Model):
     percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
     is_passed = models.BooleanField(default=False)
     is_published = models.BooleanField(default=False)
+    answers_approved = models.BooleanField(default=False, help_text="Trainer approved candidate to view question answers")
     trainer_feedback = models.TextField(blank=True)
     published_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -244,3 +276,26 @@ class Result(models.Model):
 
     def __str__(self):
         return f"{self.student.username} - {self.exam.title}: {self.score}/{self.exam.total_marks}"
+
+
+class ExamRetakeRequest(models.Model):
+    STATUS_CHOICES = (
+        ('PENDING', 'Pending Admin Approval'),
+        ('APPROVED', 'Approved by Admin'),
+        ('REJECTED', 'Rejected'),
+    )
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='retake_requests')
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='retake_requests')
+    reason = models.TextField(help_text="Reason for requesting retake")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    admin_notes = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_retakes')
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'portal_exam_retake_requests'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Retake Request: {self.student.username} for {self.exam.title} ({self.status})"

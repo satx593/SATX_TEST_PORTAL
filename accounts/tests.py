@@ -167,15 +167,15 @@ class PortalEndToEndIntegrationTests(TestCase):
         self.assertEqual(result.correct_answers, 1)
 
     def test_mandatory_branding_and_developer_credits(self):
-        """Verify developer credits 'SARATHY & THIRUMAL' render properly in templates."""
+        """Verify developer credits 'Team SAT' render properly in templates."""
         res = self.client.get(reverse('login'))
         self.assertContains(res, "PUMO TECHNOVATION")
         self.assertContains(res, "POONAMALLEE")
-        self.assertContains(res, "Developed By <strong>SARATHY &amp; THIRUMAL</strong>")
+        self.assertContains(res, "Developed By <strong>Team SAT</strong>")
         self.assertContains(res, "2026 PUMO TECHNOVATION. All Rights Reserved.")
 
     def test_tab_switch_warnings_and_expulsion(self):
-        """Test that switching tabs logs warnings and exceeding 3 terminates/expels the student."""
+        """Test that switching tabs logs warnings and exceeding 2 terminates/expels the student."""
         self.client.login(username='student_test', password='Password123!')
 
         # Enter exam room
@@ -185,8 +185,8 @@ class PortalEndToEndIntegrationTests(TestCase):
         session = ExamSession.objects.get(exam=self.exam, student=self.student)
         self.assertEqual(session.tab_switch_count, 0)
 
-        # Tab switch 1, 2, 3 (Warnings 1 to 3)
-        for i in range(1, 4):
+        # Tab switch 1, 2 (Warnings 1 to 2)
+        for i in range(1, 3):
             log_res = self.client.post(
                 reverse('proctoring_event_api'),
                 data=json.dumps({
@@ -201,20 +201,20 @@ class PortalEndToEndIntegrationTests(TestCase):
             self.assertEqual(data['tab_switch_count'], i)
             self.assertFalse(data['is_terminated'])
 
-        # 4th Tab Switch (Exceeds 3 warnings -> Expelled)
-        log_res_4 = self.client.post(
+        # 3rd Tab Switch (Exceeds 2 warnings -> Expelled)
+        log_res_3 = self.client.post(
             reverse('proctoring_event_api'),
             data=json.dumps({
                 'session_id': session.id,
                 'event_type': 'TAB_SWITCH',
-                'details': 'Tab switch violation 4 (Exceeded 3 warnings)'
+                'details': 'Tab switch violation 3 (Exceeded 2 warnings)'
             }),
             content_type='application/json'
         )
-        self.assertEqual(log_res_4.status_code, 200)
-        data_4 = log_res_4.json()
-        self.assertEqual(data_4['tab_switch_count'], 4)
-        self.assertTrue(data_4['is_terminated'])
+        self.assertEqual(log_res_3.status_code, 200)
+        data_3 = log_res_3.json()
+        self.assertEqual(data_3['tab_switch_count'], 3)
+        self.assertTrue(data_3['is_terminated'])
 
         # Auto submit via termination URL
         submit_res = self.client.get(reverse('submit_exam', kwargs={'session_id': session.id}) + '?reason=tab_switch_violation')
@@ -227,3 +227,109 @@ class PortalEndToEndIntegrationTests(TestCase):
         # Student cannot re-enter exam room
         re_enter_res = self.client.get(reverse('take_exam', kwargs={'exam_id': self.exam.id}))
         self.assertRedirects(re_enter_res, reverse('student_results'))
+
+    def test_coding_problem_execution_and_auto_scoring(self):
+        """Test full coding problem execution, auto-scoring against test cases, and result recording."""
+        coding_q = Question.objects.create(
+            question_type='CODING',
+            course=self.course,
+            topic='Python Basics',
+            difficulty='EASY',
+            question_text='Write a program to check if an integer is Odd or Even.',
+            marks=20,
+            sample_input='10',
+            sample_output='Even',
+            hidden_input='7',
+            hidden_output='Odd',
+            created_by=self.trainer,
+            is_approved=True
+        )
+
+        coding_exam = Exam.objects.create(
+            title='Python Coding Exam',
+            course=self.course,
+            batch=self.batch,
+            exam_type='CODING',
+            duration_minutes=30,
+            total_marks=20,
+            pass_marks=10,
+            start_time=timezone.now() - timedelta(minutes=5),
+            end_time=timezone.now() + timedelta(days=1),
+            status='PUBLISHED',
+            created_by=self.trainer
+        )
+        ExamQuestion.objects.create(exam=coding_exam, question=coding_q, order=1, marks=20)
+        ExamAssignment.objects.create(exam=coding_exam, student=self.student, status='ASSIGNED')
+
+        self.client.login(username='student_test', password='Password123!')
+
+        # Start session
+        room_res = self.client.get(reverse('take_exam', kwargs={'exam_id': coding_exam.id}))
+        self.assertEqual(room_res.status_code, 200)
+
+        session = ExamSession.objects.get(exam=coding_exam, student=self.student)
+
+        # Save student code solution
+        student_code = "n = int(input())\nprint('Even' if n % 2 == 0 else 'Odd')\n"
+        save_res = self.client.post(
+            reverse('save_answer_api'),
+            data=json.dumps({
+                'session_id': session.id,
+                'question_id': coding_q.id,
+                'submitted_code': student_code,
+                'selected_option': ''
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(save_res.status_code, 200)
+
+        # Submit exam
+        submit_res = self.client.post(
+            reverse('submit_exam', kwargs={'session_id': session.id}),
+            data={'submitted_code': student_code}
+        )
+        self.assertRedirects(submit_res, reverse('student_results'))
+
+        # Verify Result
+        result = Result.objects.get(exam=coding_exam, student=self.student)
+        self.assertEqual(result.score, Decimal('20.00'))
+        self.assertEqual(result.correct_answers, 1)
+        self.assertEqual(result.wrong_answers, 0)
+        self.assertTrue(result.is_passed)
+        self.assertEqual(result.percentage, Decimal('100.00'))
+
+    def test_approval_space_cancellation_and_deletion(self):
+        """Test deleting/cancelling unapproved questions and deleting retake requests in approval spaces."""
+        from exams.models import ExamRetakeRequest
+
+        # 1. Trainer deletes unapproved question in PDF review approval space
+        unapproved_q = Question.objects.create(
+            question_type='MCQ_SINGLE',
+            course=self.course,
+            question_text='Raw unapproved question to delete',
+            marks=1,
+            created_by=self.trainer,
+            is_approved=False
+        )
+        self.client.login(username='trainer_test', password='Password123!')
+        del_q_res = self.client.post(
+            reverse('pdf_review_all'),
+            data={'action': 'delete_single', 'question_id': unapproved_q.id}
+        )
+        self.assertEqual(del_q_res.status_code, 302)
+        self.assertFalse(Question.objects.filter(id=unapproved_q.id).exists())
+
+        # 2. Super Admin deletes a retake request in retake approval space
+        retake_req = ExamRetakeRequest.objects.create(
+            exam=self.exam,
+            student=self.student,
+            reason='Need to retake',
+            status='PENDING'
+        )
+        self.client.login(username='admin_test', password='Password123!')
+        del_req_res = self.client.post(
+            reverse('admin_retakes'),
+            data={'action': 'delete', 'request_id': retake_req.id}
+        )
+        self.assertEqual(del_req_res.status_code, 302)
+        self.assertFalse(ExamRetakeRequest.objects.filter(id=retake_req.id).exists())

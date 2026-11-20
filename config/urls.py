@@ -1,6 +1,6 @@
 """
 URL configuration for PUMO TECHNOVATION EXAM PORTAL - POONAMALLEE.
-Developed By SARATHY & THIRUMAL
+Developed By Team SAT
 """
 from django.contrib import admin
 from django.urls import path, include

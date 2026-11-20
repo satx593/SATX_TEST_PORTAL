@@ -1,6 +1,6 @@
 {% extends 'base/base.html' %}
 
-{% block title %}Super Admin Dashboard - PUMO Technovation{% endblock %}
+{% block title %}Super Admin Dashboard - SATX{% endblock %}
 
 {% block content %}
 <div class="container py-4">
@@ -71,7 +71,7 @@
                 <a href="{% url 'admin_students' %}" class="btn btn-pumo-outline"><i class="bi bi-person-lines-fill me-1"></i>Manage Students</a>
                 <a href="{% url 'admin_courses' %}" class="btn btn-pumo-outline"><i class="bi bi-book me-1"></i>Courses Catalog</a>
                 <a href="{% url 'admin_batches' %}" class="btn btn-pumo-outline"><i class="bi bi-diagram-3 me-1"></i>Batches</a>
-                <a href="{% url 'admin_audit_logs' %}" class="btn btn-outline-secondary"><i class="bi bi-shield-check me-1"></i>System Audit Logs</a>
+                <a href="{% url 'admin_leaderboard' %}" class="btn btn-warning text-dark fw-bold"><i class="bi bi-award-fill me-1"></i>Student Results</a>
             </div>
         </div>
     </div>

@@ -6,8 +6,8 @@ def portal_branding(request):
     and portal identity are globally available in all templates.
     """
     return {
-        'PLATFORM_NAME': getattr(settings, 'PLATFORM_NAME', 'PUMO TECHNOVATION EXAM PORTAL'),
-        'PLATFORM_BRANCH': getattr(settings, 'PLATFORM_BRANCH', 'POONAMALLEE'),
-        'DEVELOPER_CREDITS': getattr(settings, 'DEVELOPER_CREDITS', 'SARATHY & THIRUMAL'),
-        'FOOTER_COPYRIGHT': getattr(settings, 'FOOTER_COPYRIGHT', '© 2026 PUMO TECHNOVATION. All Rights Reserved.'),
+        'PLATFORM_NAME': getattr(settings, 'PLATFORM_NAME', 'SATX'),
+        'PLATFORM_BRANCH': getattr(settings, 'PLATFORM_BRANCH', 'EXAM PORTAL'),
+        'DEVELOPER_CREDITS': getattr(settings, 'DEVELOPER_CREDITS', 'Team SAT'),
+        'FOOTER_COPYRIGHT': getattr(settings, 'FOOTER_COPYRIGHT', '© 2026 SATX. All Rights Reserved.'),
     }

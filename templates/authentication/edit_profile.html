@@ -1,0 +1,133 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Edit Profile &amp; Resume - SATX{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card card-pumo shadow-sm">
+                <div class="card-header card-header-pumo d-flex justify-content-between align-items-center">
+                    <span class="fw-bold text-primary fs-5"><i class="bi bi-pencil-square me-2"></i>Edit Profile &amp; Upload Resume</span>
+                    <a href="{% url 'profile' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to Profile</a>
+                </div>
+
+                <div class="card-body p-4">
+                    <form method="POST" enctype="multipart/form-data">
+                        {% csrf_token %}
+
+                        <!-- Profile Picture Section -->
+                        <div class="d-flex align-items-center gap-4 mb-4 pb-3 border-bottom">
+                            <div class="position-relative">
+                                {% if user.profile_picture %}
+                                    <img src="{{ user.profile_picture.url }}" alt="{{ user.username }}" class="rounded-circle border border-primary shadow-sm" style="width: 90px; height: 90px; object-fit: cover;" id="profilePreview">
+                                {% else %}
+                                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fs-1 fw-bold shadow-sm" style="width: 90px; height: 90px;" id="profilePreviewDefault">
+                                        {{ user.username|first|upper }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="flex-grow-1">
+                                <label class="form-label small fw-semibold text-secondary text-uppercase mb-1">Update Profile Picture</label>
+                                <input type="file" class="form-control" name="profile_picture" accept="image/*" onchange="previewImage(this)">
+                                <small class="text-muted">Accepted formats: JPG, PNG, WEBP (Max 2MB)</small>
+                            </div>
+                        </div>
+
+                        <!-- Personal Details -->
+                        <h6 class="fw-bold text-primary mb-3"><i class="bi bi-person me-2"></i>Personal Information</h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">First Name</label>
+                                <input type="text" class="form-control" name="first_name" value="{{ user.first_name }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Last Name</label>
+                                <input type="text" class="form-control" name="last_name" value="{{ user.last_name }}">
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Email Address</label>
+                                <input type="email" class="form-control" name="email" value="{{ user.email }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Phone Number</label>
+                                <input type="text" class="form-control" name="phone_number" value="{{ user.phone_number|default:'' }}" placeholder="+91 98765 43210">
+                            </div>
+                        </div>
+
+                        {% if student_profile %}
+                        <!-- Resume & Student Career Details -->
+                        <h6 class="fw-bold text-primary mb-3 pt-3 border-top"><i class="bi bi-file-earmark-person me-2"></i>Resume &amp; Career Portfolio</h6>
+                        
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Upload Candidate Resume (PDF / DOCX)</label>
+                            <input type="file" class="form-control" name="resume" accept=".pdf,.doc,.docx">
+                            {% if student_profile.resume %}
+                            <div class="mt-2 small">
+                                <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Current Resume:</span>
+                                <a href="{{ student_profile.resume.url }}" target="_blank" class="fw-semibold text-primary">
+                                    <i class="bi bi-download me-1"></i>View / Download Uploaded Resume
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Short Bio / Career Goals</label>
+                            <textarea class="form-control" name="bio" rows="3" placeholder="Tell us about your technical goals and skills...">{{ student_profile.bio }}</textarea>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold"><i class="bi bi-github me-1"></i>GitHub Profile</label>
+                                <input type="url" class="form-control" name="github_profile" value="{{ student_profile.github_profile|default:'' }}" placeholder="https://github.com/yourusername">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold"><i class="bi bi-linkedin me-1"></i>LinkedIn Profile</label>
+                                <input type="url" class="form-control" name="linkedin_profile" value="{{ student_profile.linkedin_profile|default:'' }}" placeholder="https://linkedin.com/in/yourusername">
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                            <a href="{% url 'profile' %}" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-pumo px-4 shadow-sm">
+                                <i class="bi bi-save me-1"></i>Save Profile Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function previewImage(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                let preview = document.getElementById('profilePreview');
+                if (!preview) {
+                    const def = document.getElementById('profilePreviewDefault');
+                    if (def) def.remove();
+                    preview = document.createElement('img');
+                    preview.id = 'profilePreview';
+                    preview.className = 'rounded-circle border border-primary shadow-sm';
+                    preview.style.width = '90px';
+                    preview.style.height = '90px';
+                    preview.style.objectFit = 'cover';
+                    input.closest('.d-flex').querySelector('.position-relative').appendChild(preview);
+                }
+                preview.src = e.target.result;
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+</script>
+{% endblock %}

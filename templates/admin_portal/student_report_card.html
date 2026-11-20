@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Official Marksheet - {{ student.get_full_name|default:student.username }} - SATX</title>
+
+    <!-- Bootstrap 5 CSS & Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <style>
+        :root {
+            --pumo-navy: #102a45;
+            --pumo-blue: #0f4c81;
+            --pumo-royal: #1d4ed8;
+            --pumo-light-bg: #f8fafc;
+            --pumo-border: #cbd5e1;
+            --pumo-text-dark: #0f172a;
+            --pumo-text-muted: #64748b;
+        }
+
+        body {
+            background-color: #e2e8f0;
+            color: var(--pumo-text-dark);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .report-sheet {
+            max-width: 860px;
+            margin: 25px auto;
+            background: #ffffff;
+            border-radius: 14px;
+            box-shadow: 0 8px 30px rgba(15, 23, 42, 0.12);
+            overflow: hidden;
+            position: relative;
+            border: 1px solid #cbd5e1;
+        }
+
+        /* Top Decorative Curved Wave */
+        .header-wave {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 48%;
+            height: 115px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .report-header {
+            position: relative;
+            padding: 24px 32px 18px 32px;
+            z-index: 2;
+        }
+
+        .company-logo {
+            width: 64px;
+            height: 64px;
+            object-fit: contain;
+            border-radius: 50%;
+            background: #ffffff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            padding: 2px;
+        }
+
+        .company-title {
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: var(--pumo-navy);
+            letter-spacing: 0.5px;
+            line-height: 1.1;
+            margin-bottom: 2px;
+        }
+
+        .company-sub {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--pumo-navy);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        .company-addr {
+            font-size: 0.76rem;
+            color: var(--pumo-text-muted);
+            margin-bottom: 0;
+        }
+
+        /* Laurel Wreath Banner */
+        .banner-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 10px;
+            margin-bottom: 4px;
+        }
+
+        .laurel-svg {
+            width: 36px;
+            height: 44px;
+            fill: var(--pumo-navy);
+        }
+
+        .official-ribbon {
+            background: var(--pumo-navy);
+            color: #ffffff;
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            padding: 8px 38px;
+            border-radius: 6px;
+            clip-path: polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%);
+            box-shadow: 0 3px 8px rgba(16, 42, 69, 0.25);
+        }
+
+        .ref-id-badge {
+            text-align: right;
+            padding-right: 32px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--pumo-text-dark);
+            margin-bottom: 14px;
+        }
+
+        /* Two-Column Structured Info Cards */
+        .info-cards-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            padding: 0 32px;
+            margin-bottom: 20px;
+        }
+
+        .pumo-card {
+            border: 1.5px solid #cbd5e1;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #ffffff;
+        }
+
+        .pumo-card-header {
+            background: var(--pumo-navy);
+            color: #ffffff;
+            font-size: 0.84rem;
+            font-weight: 800;
+            letter-spacing: 0.6px;
+            padding: 7px 14px;
+            text-transform: uppercase;
+        }
+
+        .pumo-card-body {
+            padding: 6px 14px;
+        }
+
+        .info-row {
+            display: grid;
+            grid-template-columns: 100px 14px 1fr;
+            align-items: center;
+            padding: 6px 0;
+            font-size: 0.82rem;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: #334155;
+            font-weight: 600;
+        }
+
+        .info-colon {
+            color: #64748b;
+            font-weight: 700;
+        }
+
+        .info-val {
+            color: #0f172a;
+            font-weight: 700;
+            word-break: break-word;
+        }
+
+        /* Section Divider with Center Ribbon */
+        .section-divider {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 32px;
+            margin: 18px 0 12px 0;
+        }
+
+        .divider-line {
+            flex: 1;
+            height: 1.5px;
+            background: #64748b;
+            opacity: 0.6;
+        }
+
+        .section-ribbon {
+            background: var(--pumo-navy);
+            color: #ffffff;
+            font-size: 0.88rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 5px 26px;
+            border-radius: 4px;
+            clip-path: polygon(10px 0%, calc(100% - 10px) 0%, 100% 50%, calc(100% - 10px) 100%, 10px 100%, 0% 50%);
+            margin: 0 12px;
+        }
+
+        /* Result Summary Table Card */
+        .summary-card {
+            margin: 0 32px 20px 32px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+        }
+
+        .summary-col {
+            text-align: center;
+            border-right: 1.5px solid #cbd5e1;
+        }
+
+        .summary-col:last-child {
+            border-right: none;
+        }
+
+        .summary-th {
+            background: #e8f0fe;
+            color: var(--pumo-navy);
+            font-size: 0.84rem;
+            font-weight: 800;
+            padding: 9px 4px;
+            border-bottom: 1.5px solid #cbd5e1;
+        }
+
+        .summary-td {
+            padding: 12px 4px;
+            background: #ffffff;
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 58px;
+        }
+
+        .status-pill-passed {
+            background: #e8f7ee;
+            color: #16a34a;
+            border: 1.5px solid #86efac;
+            border-radius: 6px;
+            padding: 5px 14px;
+            font-size: 0.88rem;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .status-pill-failed {
+            background: #fee2e2;
+            color: #dc2626;
+            border: 1.5px solid #fca5a5;
+            border-radius: 6px;
+            padding: 5px 14px;
+            font-size: 0.88rem;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        /* Performance Overview & Integrity Log */
+        .overview-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            padding: 0 32px;
+            margin-bottom: 20px;
+        }
+
+        /* Donut Chart Ring */
+        .donut-container {
+            width: 105px;
+            height: 105px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .donut-inner {
+            width: 72px;
+            height: 72px;
+            background: #ffffff;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
+        }
+
+        .donut-pct {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1.1;
+        }
+
+        .donut-lbl {
+            font-size: 0.65rem;
+            color: #64748b;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .legend-row {
+            display: grid;
+            grid-template-columns: 14px 130px 10px 1fr;
+            align-items: center;
+            padding: 5px 0;
+            font-size: 0.8rem;
+        }
+
+        .legend-swatch {
+            width: 13px;
+            height: 13px;
+            border-radius: 3px;
+        }
+
+        .bg-swatch-navy { background-color: var(--pumo-navy); }
+        .bg-swatch-gray { background-color: #94a3b8; }
+        .bg-swatch-lightblue { background-color: #93c5fd; }
+
+        /* Assessment Integrity Rows */
+        .integrity-item {
+            display: grid;
+            grid-template-columns: 24px 1fr 10px auto;
+            align-items: center;
+            padding: 8px 0;
+            font-size: 0.82rem;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .integrity-item:last-child {
+            border-bottom: none;
+        }
+
+        .badge-clean {
+            background: #e8f7ee;
+            color: #16a34a;
+            border: 1px solid #86efac;
+            padding: 3px 10px;
+            border-radius: 5px;
+            font-weight: 700;
+            font-size: 0.78rem;
+        }
+
+        .badge-warn {
+            background: #fef3c7;
+            color: #d97706;
+            border: 1px solid #fde68a;
+            padding: 3px 10px;
+            border-radius: 5px;
+            font-weight: 700;
+            font-size: 0.78rem;
+        }
+
+        .badge-danger {
+            background: #fee2e2;
+            color: #dc2626;
+            border: 1px solid #fca5a5;
+            padding: 3px 10px;
+            border-radius: 5px;
+            font-weight: 700;
+            font-size: 0.78rem;
+        }
+
+        /* Signatures Block */
+        .signatures-row {
+            display: grid;
+            grid-template-columns: 1fr 120px 1fr;
+            align-items: end;
+            text-align: center;
+            padding: 10px 40px 24px 40px;
+        }
+
+        .sig-col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .sig-space {
+            height: 50px;
+            width: 80%;
+        }
+
+        .sig-dashed-line {
+            border-bottom: 1.5px dashed #64748b;
+            width: 75%;
+            margin: 6px auto 6px auto;
+        }
+
+        .sig-name {
+            font-size: 0.86rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .sig-role {
+            font-size: 0.72rem;
+            color: #64748b;
+        }
+
+        /* Circular Official Seal */
+        .official-seal-badge {
+            width: 86px;
+            height: 86px;
+            border: 2.5px solid var(--pumo-navy);
+            outline: 1.5px dashed var(--pumo-navy);
+            outline-offset: -5px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            color: var(--pumo-navy);
+        }
+
+        .seal-pumo {
+            font-size: 0.64rem;
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .seal-stars {
+            font-size: 0.65rem;
+            letter-spacing: 2px;
+            margin-top: 2px;
+        }
+
+        /* Full Width Bottom Footer Bar */
+        .report-bottom-bar {
+            background: var(--pumo-navy);
+            color: #ffffff;
+            text-align: center;
+            font-size: 0.76rem;
+            font-weight: 600;
+            padding: 10px 16px;
+            letter-spacing: 0.4px;
+        }
+
+        /* Print Media Styles */
+        @media print {
+            body {
+                background: #ffffff !important;
+                margin: 0;
+                padding: 0;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .report-sheet {
+                box-shadow: none !important;
+                border: none !important;
+                margin: 0 auto !important;
+                max-width: 100% !important;
+                border-radius: 0 !important;
+            }
+            .header-wave {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .status-pill-passed {
+                background-color: #e8f7ee !important;
+                color: #16a34a !important;
+            }
+            .status-pill-failed {
+                background-color: #fee2e2 !important;
+                color: #dc2626 !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Print & Navigation Control Bar (Screen Only) -->
+    <div class="container my-3 no-print" style="max-width: 860px;">
+        <div class="d-flex justify-content-between align-items-center bg-white p-3 rounded shadow-sm border">
+            <div>
+                {% if request.user.role == 'STUDENT' %}
+                <a href="{% url 'student_results' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i>Back to Results
+                </a>
+                {% else %}
+                <a href="{% url 'admin_leaderboard' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i>Back to Leaderboard
+                </a>
+                {% endif %}
+            </div>
+            <div class="d-flex gap-2">
+                {% if request.user.role in 'ADMIN SUPER_ADMIN TRAINER' or request.user.is_superuser %}
+                <a href="{% url 'admin_toggle_answers_approval' result.id %}" class="btn btn-sm {% if result.answers_approved %}btn-success text-white{% else %}btn-outline-primary{% endif %}">
+                    <i class="bi {% if result.answers_approved %}bi-check-circle-fill{% else %}bi-shield-check{% endif %} me-1"></i>
+                    {% if result.answers_approved %}Answers Released{% else %}Approve Answers{% endif %}
+                </a>
+                {% endif %}
+                <a href="{% url 'download_qa_sheet_pdf' result.id %}" class="btn btn-outline-success btn-sm" target="_blank" download>
+                    <i class="bi bi-file-earmark-pdf-fill me-1"></i>Download Q&amp;A Sheet (PDF)
+                </a>
+                <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">
+                    <i class="bi bi-printer-fill me-1"></i>Print Official Marksheet
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Official Marksheet Container -->
+    <div class="report-sheet">
+
+        <!-- Top Decorative Curved Waves (Navy & Royal Blue Gradient) -->
+        <svg class="header-wave" viewBox="0 0 450 115" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M90 0C180 15 250 85 450 60V0H90Z" fill="#1d4ed8" fill-opacity="0.25"/>
+            <path d="M150 0C230 10 300 80 450 45V0H150Z" fill="#102a45"/>
+        </svg>
+
+        <!-- Top Header: Logo + Organization Info -->
+        <div class="report-header">
+            <div class="d-flex align-items-center gap-3">
+                <img src="/static/images/satx_logo.png?v=2026.4" alt="SATX Logo" class="company-logo" style="object-fit: contain;">
+                <div>
+                    <h2 class="company-title">SATX</h2>
+                    <h5 class="company-sub">EXAM PORTAL</h5>
+                    <p class="company-addr">Official Academic &amp; Assessment Examination Record</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Official Marksheet Laurel Banner -->
+        <div class="banner-container">
+            <!-- Left Laurel Branch -->
+            <svg class="laurel-svg" viewBox="0 0 40 48">
+                <path d="M28 42C20 38 12 30 10 20C9 14 10 8 12 2C8 6 5 13 5 21C5 31 15 41 26 45L28 42Z"/>
+                <path d="M14 14C11 11 8 6 9 3C12 4 16 9 16 13C16 14 15 14 14 14Z"/>
+                <path d="M12 24C8 22 5 18 5 14C9 14 14 18 14 23C14 24 13 24 12 24Z"/>
+                <path d="M14 34C10 32 6 29 6 24C10 25 15 28 16 33C16 34 15 34 14 34Z"/>
+                <path d="M22 41C18 39 14 37 13 32C17 33 22 35 23 40C23 41 23 41 22 41Z"/>
+                <path d="M25 8C21 7 17 4 17 1C21 1 26 5 27 8C27 8 26 8 25 8Z"/>
+                <path d="M24 18C19 17 16 13 16 10C20 10 25 14 26 18C26 18 25 18 24 18Z"/>
+                <path d="M26 28C21 27 18 24 18 20C22 20 27 24 28 28C28 28 27 28 26 28Z"/>
+            </svg>
+
+            <!-- Center Ribbon -->
+            <div class="official-ribbon">OFFICIAL MARKSHEET</div>
+
+            <!-- Right Laurel Branch (Mirrored) -->
+            <svg class="laurel-svg" viewBox="0 0 40 48" style="transform: scaleX(-1);">
+                <path d="M28 42C20 38 12 30 10 20C9 14 10 8 12 2C8 6 5 13 5 21C5 31 15 41 26 45L28 42Z"/>
+                <path d="M14 14C11 11 8 6 9 3C12 4 16 9 16 13C16 14 15 14 14 14Z"/>
+                <path d="M12 24C8 22 5 18 5 14C9 14 14 18 14 23C14 24 13 24 12 24Z"/>
+                <path d="M14 34C10 32 6 29 6 24C10 25 15 28 16 33C16 34 15 34 14 34Z"/>
+                <path d="M22 41C18 39 14 37 13 32C17 33 22 35 23 40C23 41 23 41 22 41Z"/>
+                <path d="M25 8C21 7 17 4 17 1C21 1 26 5 27 8C27 8 26 8 25 8Z"/>
+                <path d="M24 18C19 17 16 13 16 10C20 10 25 14 26 18C26 18 25 18 24 18Z"/>
+                <path d="M26 28C21 27 18 24 18 20C22 20 27 24 28 28C28 28 27 28 26 28Z"/>
+            </svg>
+        </div>
+
+        <!-- Ref ID Line -->
+        <div class="ref-id-badge">
+            Ref ID: #RES-{{ result.id }}-{{ result.created_at|date:"Ymd" }}
+        </div>
+
+        <!-- Structured 2-Column Information: Candidate & Assessment -->
+        <div class="info-cards-row">
+            <!-- Candidate Information Card -->
+            <div class="pumo-card">
+                <div class="pumo-card-header">
+                    <i class="bi bi-person-fill me-2"></i>CANDIDATE INFORMATION
+                </div>
+                <div class="pumo-card-body">
+                    <div class="info-row">
+                        <span class="info-label">Full Name</span>
+                        <span class="info-colon">:</span>
+                        <span class="info-val">{{ student.get_full_name|default:student.username }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Student ID</span>
+                        <span class="info-colon">:</span>
+                        <span class="info-val">{{ profile.reg_no|default:student.username }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Username</span>
+                        <span class="info-colon">:</span>
+                        <span class="info-val">{{ student.username }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Email</span>
+                        <span class="info-colon">:</span>
+                        <span class="info-val">{{ student.email|default:"N/A" }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assessment Details Card -->
+            <div class="pumo-card">
+                <div class="pumo-card-header">
+                    <i class="bi bi-mortarboard-fill me-2"></i>ASSESSMENT DETAILS
+                </div>
+                <div class="pumo-card-body">
+                    <div class="info-row">
+                        <span class="info-label">Exam Title</span>
+                        <span class="info-colon">:</span>
+                        <span class="info-val">{{ exam.title }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Course</span>
+                        <span class="info-colon">:</span>
+                        <span class="info-val">{{ exam.course.name|default:"General Course" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Batch</span>
+                        <span class="info-colon">:</span>
+                        <span class="info-val">{{ profile.batch.name|default:"General Batch" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Exam Type</span>
+                        <span class="info-colon">:</span>
+                        <span class="info-val">{{ exam.get_exam_type_display }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Summary Ribbon Divider -->
+        <div class="section-divider">
+            <div class="divider-line"></div>
+            <div class="section-ribbon">RESULT SUMMARY</div>
+            <div class="divider-line"></div>
+        </div>
+
+        <!-- Result Summary Table Card -->
+        <div class="summary-card">
+            <div class="summary-grid">
+                <div class="summary-col">
+                    <div class="summary-th">Total Marks</div>
+                    <div class="summary-td">{{ exam.total_marks }}</div>
+                </div>
+                <div class="summary-col">
+                    <div class="summary-th">Marks Obtained</div>
+                    <div class="summary-td">{{ result.score }}</div>
+                </div>
+                <div class="summary-col">
+                    <div class="summary-th">Percentage</div>
+                    <div class="summary-td">{{ result.percentage }}%</div>
+                </div>
+                <div class="summary-col">
+                    <div class="summary-th">Passing Mark</div>
+                    <div class="summary-td">{{ exam.pass_marks }}</div>
+                </div>
+                <div class="summary-col">
+                    <div class="summary-th">Final Status</div>
+                    <div class="summary-td">
+                        {% if result.is_passed %}
+                        <span class="status-pill-passed"><i class="bi bi-check-circle-fill me-1"></i>PASSED</span>
+                        {% else %}
+                        <span class="status-pill-failed"><i class="bi bi-x-circle-fill me-1"></i>FAILED</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Overview & Assessment Integrity Log -->
+        <div class="overview-row">
+            <!-- Performance Overview Card -->
+            <div class="pumo-card">
+                <div class="pumo-card-header">
+                    <i class="bi bi-bar-chart-fill me-2"></i>PERFORMANCE OVERVIEW
+                </div>
+                <div class="pumo-card-body d-flex align-items-center justify-content-around py-3">
+                    <!-- Donut Chart -->
+                    <div class="donut-container" style="background: conic-gradient(var(--pumo-navy) {{ percentage_val }}%, #cbd5e1 {{ percentage_val }}% 100%);">
+                        <div class="donut-inner">
+                            <div class="donut-pct">{{ result.percentage }}%</div>
+                            <div class="donut-lbl">Score</div>
+                        </div>
+                    </div>
+
+                    <!-- Legend Breakdown -->
+                    <div>
+                        <div class="legend-row">
+                            <span class="legend-swatch bg-swatch-navy"></span>
+                            <span class="text-secondary fw-semibold">Marks Obtained</span>
+                            <span class="text-secondary fw-bold">:</span>
+                            <strong class="text-dark">{{ result.score }}</strong>
+                        </div>
+                        <div class="legend-row">
+                            <span class="legend-swatch bg-swatch-gray"></span>
+                            <span class="text-secondary fw-semibold">Marks Not Obtained</span>
+                            <span class="text-secondary fw-bold">:</span>
+                            <strong class="text-dark">{{ marks_not_obtained }}</strong>
+                        </div>
+                        <div class="legend-row">
+                            <span class="legend-swatch bg-swatch-lightblue"></span>
+                            <span class="text-secondary fw-semibold">Total Marks</span>
+                            <span class="text-secondary fw-bold">:</span>
+                            <strong class="text-dark">{{ exam.total_marks }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assessment Integrity Log Card -->
+            <div class="pumo-card">
+                <div class="pumo-card-header">
+                    <i class="bi bi-shield-fill-check me-2"></i>ASSESSMENT INTEGRITY LOG
+                </div>
+                <div class="pumo-card-body py-2">
+                    <div class="integrity-item">
+                        <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                        <span class="text-secondary fw-semibold ps-1">Tab Switches Detected</span>
+                        <span class="text-secondary fw-bold">:</span>
+                        <strong class="fs-6 text-dark">{{ session.tab_switch_count|default:0 }}</strong>
+                    </div>
+                    <div class="integrity-item">
+                        <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                        <span class="text-secondary fw-semibold ps-1">Face Absence Warnings</span>
+                        <span class="text-secondary fw-bold">:</span>
+                        <strong class="fs-6 text-dark">{{ session.face_absence_count|default:0 }}</strong>
+                    </div>
+                    <div class="integrity-item">
+                        <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                        <span class="text-secondary fw-semibold ps-1">Exam Integrity Rating</span>
+                        <span class="text-secondary fw-bold">:</span>
+                        <div>
+                            {% if session.tab_switch_count == 0 and session.face_absence_count == 0 %}
+                            <span class="badge-clean"><i class="bi bi-check-circle-fill me-1"></i>Verified Clean</span>
+                            {% elif session.tab_switch_count <= 2 %}
+                            <span class="badge-warn"><i class="bi bi-exclamation-circle-fill me-1"></i>Minor Warnings</span>
+                            {% else %}
+                            <span class="badge-danger"><i class="bi bi-shield-x me-1"></i>Violations Logged</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Signatures & Official Seal Block -->
+        <div class="signatures-row">
+            <!-- Trainer / Examiner Signature -->
+            <div class="sig-col">
+                <div class="sig-space"></div>
+                <div class="sig-dashed-line"></div>
+                <div class="sig-name">Trainer / Examiner</div>
+                <div class="sig-role">Assessment Evaluator</div>
+            </div>
+
+            <!-- Official Seal -->
+            <div>
+                <div class="official-seal-badge">
+                    <div class="seal-pumo">PUMO<br>TECHNOVATION</div>
+                    <div class="seal-stars">&#9733; &#9733; &#9733;</div>
+                </div>
+            </div>
+
+            <!-- Branch Administrator Signature -->
+            <div class="sig-col">
+                <div class="sig-space"></div>
+                <div class="sig-dashed-line"></div>
+                <div class="sig-name">Branch Administrator</div>
+                <div class="sig-role">Poonamallee Centre Head</div>
+            </div>
+        </div>
+
+        <!-- Full-Width Bottom Bar -->
+        <div class="report-bottom-bar">
+            SATX EXAM PORTAL &nbsp;|&nbsp; Developed By Team SAT &nbsp;|&nbsp; &copy; 2026 All Rights Reserved.
+        </div>
+
+    </div>
+
+</body>
+</html>

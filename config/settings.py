@@ -1,6 +1,6 @@
 """
 Django settings for PUMO TECHNOVATION EXAM PORTAL - POONAMALLEE.
-Developed By SARATHY & THIRUMAL
+Developed By Team SAT
 """
 
 import os
@@ -17,7 +17,13 @@ load_dotenv(BASE_DIR / '.env')
 SECRET_KEY = os.getenv('SECRET_KEY', 'pumo-exam-portal-secret-key-sarathy-thirumal-2026')
 DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 't')
 
-ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,::1').split(',') if h.strip()] + ['testserver']
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*').split(',') if h.strip()] + ['testserver']
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip() for origin in os.getenv(
+        'CSRF_TRUSTED_ORIGINS',
+        'http://localhost:8000,http://127.0.0.1:8000,http://localhost,http://127.0.0.1'
+    ).split(',') if origin.strip()
+]
 
 # Application definition
 INSTALLED_APPS = [
@@ -71,9 +77,9 @@ AUTH_USER_MODEL = 'accounts.User'
 
 # Database Configuration (MySQL 8 with fallback support if needed)
 DB_ENGINE = os.getenv('DB_ENGINE', 'django.db.backends.mysql')
-DB_NAME = os.getenv('DB_NAME', 'pumo_exam_portal')
+DB_NAME = os.getenv('DB_NAME', 'satx_exam_portal')
 DB_USER = os.getenv('DB_USER', 'root')
-DB_PASSWORD = os.getenv('DB_PASSWORD', 'Sarathy@123')
+DB_PASSWORD = os.getenv('DB_PASSWORD', 'root')
 DB_HOST = os.getenv('DB_HOST', '127.0.0.1')
 DB_PORT = os.getenv('DB_PORT', '3306')
 
@@ -139,10 +145,22 @@ CSRF_COOKIE_HTTPONLY = False
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Portal Branding Metadata
-PLATFORM_NAME = "PUMO TECHNOVATION EXAM PORTAL"
-PLATFORM_BRANCH = "POONAMALLEE"
-DEVELOPER_CREDITS = "SARATHY & THIRUMAL"
-FOOTER_COPYRIGHT = "© 2026 PUMO TECHNOVATION. All Rights Reserved."
+PLATFORM_NAME = "SATX"
+PLATFORM_BRANCH = "EXAM PORTAL"
+DEVELOPER_CREDITS = "Team SAT"
+FOOTER_COPYRIGHT = "© 2026 SATX. All Rights Reserved."
+
+# Email Configuration
+EMAIL_BACKEND = os.getenv(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.smtp.EmailBackend' if os.getenv('EMAIL_HOST_USER') else 'django.core.mail.backends.console.EmailBackend'
+)
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1')
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', f"SATX Exam Portal <{os.getenv('EMAIL_HOST_USER', 'noreply@satx.edu')}>")
 
 # OCR & Execution Service Settings
 TESSERACT_CMD = os.getenv('TESSERACT_CMD', r'C:\Program Files\Tesseract-OCR\tesseract.exe')

@@ -78,7 +78,52 @@ def dashboard_redirect(request):
 
 @login_required
 def profile_view(request):
-    """User profile page."""
+    """User profile overview page."""
+    student_profile = getattr(request.user, 'student_profile', None)
     return render(request, 'authentication/profile.html', {
-        'user': request.user
+        'user': request.user,
+        'student_profile': student_profile
+    })
+
+
+@login_required
+def edit_profile(request):
+    """Allows candidates to upload profile image, resume, and contact details."""
+    user = request.user
+    student_profile = getattr(user, 'student_profile', None)
+
+    if request.method == 'POST':
+        user.first_name = request.POST.get('first_name', '').strip()
+        user.last_name = request.POST.get('last_name', '').strip()
+        user.email = request.POST.get('email', '').strip()
+        user.phone_number = request.POST.get('phone_number', '').strip()
+
+        if 'profile_picture' in request.FILES:
+            user.profile_picture = request.FILES['profile_picture']
+
+        user.save()
+
+        if student_profile:
+            student_profile.bio = request.POST.get('bio', '').strip()
+            student_profile.github_profile = request.POST.get('github_profile', '').strip()
+            student_profile.linkedin_profile = request.POST.get('linkedin_profile', '').strip()
+
+            if 'resume' in request.FILES:
+                student_profile.resume = request.FILES['resume']
+
+            student_profile.save()
+
+        AuditLog.objects.create(
+            user=user,
+            action='PROFILE_UPDATED',
+            details=f"User {user.username} updated personal profile details and resume.",
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+
+        messages.success(request, "Your profile details, photo, and resume have been saved successfully!")
+        return redirect('profile')
+
+    return render(request, 'authentication/edit_profile.html', {
+        'user': user,
+        'student_profile': student_profile
     })

@@ -1,6 +1,6 @@
 {% extends 'base/base.html' %}
 
-{% block title %}My Examination Results - PUMO Technovation{% endblock %}
+{% block title %}My Examination Results - SATX{% endblock %}
 
 {% block content %}
 <div class="container py-4">
@@ -57,7 +57,7 @@
                         {% if "Terminated due to multiple tab switch" in r.trainer_feedback %}
                         <div class="alert alert-danger py-2 small mt-3 border-danger shadow-sm">
                             <strong class="d-block"><i class="bi bi-x-octagon-fill me-1"></i>Exam Terminated by AI Proctoring System:</strong>
-                            Candidate was expelled after exceeding the maximum limit of 3 tab-switching warnings.
+                            Candidate was expelled after exceeding the maximum limit of 2 tab-switching warnings.
                         </div>
                         {% else %}
                         <div class="p-2 px-3 bg-light border rounded small mt-3">
@@ -66,6 +66,243 @@
                         </div>
                         {% endif %}
                     {% endif %}
+
+                    <!-- Answer Review & Retake Actions -->
+                    <div class="mt-3 pt-3 border-top">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                            <div>
+                                {% if r.answers_approved %}
+                                <div class="d-inline-flex flex-wrap gap-2 align-items-center">
+                                    <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#answersModal{{ r.id }}">
+                                        <i class="bi bi-file-earmark-check-fill me-1"></i>View Answer Sheet
+                                    </button>
+                                    <a href="{% url 'admin_student_single_report' r.id %}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                        <i class="bi bi-award-fill me-1"></i>Official Marksheet
+                                    </a>
+                                    <a href="{% url 'download_qa_sheet_pdf' r.id %}" class="btn btn-sm btn-success text-white" target="_blank" download>
+                                        <i class="bi bi-file-earmark-pdf-fill me-1"></i>Download PDF Q&amp;A
+                                    </a>
+                                    <span class="badge bg-success-subtle text-success"><i class="bi bi-check-circle me-1"></i>Trainer Approved</span>
+                                </div>
+                                {% else %}
+                                <div class="d-inline-flex flex-wrap gap-2 align-items-center">
+                                    <a href="{% url 'admin_student_single_report' r.id %}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                        <i class="bi bi-award-fill me-1"></i>Official Marksheet
+                                    </a>
+                                    <span class="badge bg-light text-secondary border py-2 px-2">
+                                        <i class="bi bi-lock-fill me-1"></i>Detailed Answers Awaiting Trainer Approval
+                                    </span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        {% with retake_req=retake_requests %}
+                        {% if r.exam.id in retake_req %}
+                            {% with rr=retake_req|dictsort:"id" %}
+                            {% endwith %}
+                            {% for exam_id, rr in retake_req.items %}
+                                {% if exam_id == r.exam.id %}
+                                    {% if rr.status == 'PENDING' %}
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split me-1"></i>Retake Request Pending</span>
+                                        <small class="text-muted">Submitted {{ rr.created_at|date:"M d, Y" }}</small>
+                                    </div>
+                                    {% elif rr.status == 'APPROVED' %}
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Retake Approved</span>
+                                        <small class="text-muted">You can now retake this exam from your dashboard.</small>
+                                    </div>
+                                    {% elif rr.status == 'REJECTED' %}
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i>Retake Rejected</span>
+                                        {% if rr.admin_notes %}
+                                        <small class="text-muted">{{ rr.admin_notes }}</small>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            <!-- No request yet — show Request Retake button -->
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#retakeModal{{ r.exam.id }}">
+                                <i class="bi bi-arrow-repeat me-1"></i>Request Retake
+                            </button>
+                            <small class="text-muted ms-2">Must be approved by Super Admin</small>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Answer Sheet Modal for Result {{ r.id }} -->
+        {% if r.answers_approved %}
+        <div class="modal fade" id="answersModal{{ r.id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title fw-bold">
+                            <i class="bi bi-patch-check-fill me-2"></i>Official Answer Review: {{ r.exam.title }}
+                        </h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <a href="{% url 'download_qa_sheet_pdf' r.id %}" class="btn btn-sm btn-light text-success fw-bold shadow-sm" target="_blank" download>
+                                <i class="bi bi-file-earmark-pdf-fill me-1"></i>Download PDF
+                            </a>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="alert alert-success py-2 px-3 small d-flex justify-content-between align-items-center mb-3">
+                            <div><strong>Candidate Score:</strong> {{ r.score }} / {{ r.exam.total_marks }} ({{ r.percentage }}%)</div>
+                            <span class="badge bg-success">Trainer Approved</span>
+                        </div>
+
+                        <!-- Question Breakdown Palette -->
+                        {% if r.answers_list %}
+                        <div class="mb-4 p-3 bg-light rounded border">
+                            <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom">
+                                <span class="fw-bold small text-secondary text-uppercase"><i class="bi bi-grid-3x3-gap-fill me-1"></i>Questions Breakdown</span>
+                                <div class="d-flex align-items-center gap-3 small">
+                                    <span class="d-inline-flex align-items-center gap-1">
+                                        <span class="d-inline-block rounded-1" style="width: 12px; height: 12px; background-color: #16a34a;"></span>
+                                        <span class="fw-semibold text-success" style="font-size: 0.78rem;">Correct</span>
+                                    </span>
+                                    <span class="d-inline-flex align-items-center gap-1">
+                                        <span class="d-inline-block rounded-1" style="width: 12px; height: 12px; background-color: #dc2626;"></span>
+                                        <span class="fw-semibold text-danger" style="font-size: 0.78rem;">Wrong</span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for a in r.answers_list %}
+                                <a href="#answer-review-{{ r.id }}-{{ forloop.counter }}" class="text-decoration-none">
+                                    <div class="rounded d-flex flex-column align-items-center justify-content-center text-white fw-bold shadow-sm"
+                                         style="width: 44px; height: 44px; background-color: {% if a.marks_obtained > 0 %}#16a34a{% else %}#dc2626{% endif %}; border: 1.5px solid {% if a.marks_obtained > 0 %}#15803d{% else %}#b91c1c{% endif %}; transition: transform 0.15s ease;"
+                                         title="Question {{ forloop.counter }}: {% if a.marks_obtained > 0 %}Correct (+{{ a.marks_obtained }} Mark{{ a.marks_obtained|pluralize }}){% else %}Wrong (0.00 Marks){% endif %}">
+                                        <span style="font-size: 0.95rem; line-height: 1;">{{ forloop.counter }}</span>
+                                        <span style="font-size: 0.65rem; line-height: 1; margin-top: 2px; opacity: 0.95;">
+                                            {% if a.marks_obtained > 0 %}<i class="bi bi-check-lg"></i>{% else %}<i class="bi bi-x-lg"></i>{% endif %}
+                                        </span>
+                                    </div>
+                                </a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% for a in r.answers_list %}
+                        <div id="answer-review-{{ r.id }}-{{ forloop.counter }}" class="card mb-3 border {% if a.marks_obtained > 0 %}border-success-subtle{% else %}border-danger-subtle{% endif %}">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
+                                <span class="fw-bold text-dark">
+                                    <span class="badge bg-secondary me-1">Q{{ forloop.counter }}</span>
+                                    {{ a.question.get_question_type_display }}
+                                </span>
+                                <div>
+                                    <span class="badge {% if a.marks_obtained > 0 %}bg-success{% else %}bg-danger{% endif %} me-1">
+                                        {{ a.marks_obtained }} / {{ a.question.marks }} Mark{{ a.question.marks|pluralize }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="card-body p-3">
+                                <h6 class="fw-semibold text-dark mb-3">{{ a.question.question_text }}</h6>
+
+                                {% if a.question.question_type == 'MCQ_SINGLE' or a.question.question_type == 'MCQ_MULTI' %}
+                                <div class="row g-2 mb-2">
+                                    {% for opt in a.question.options.all %}
+                                    <div class="col-12">
+                                        <div class="p-2 border rounded small d-flex justify-content-between align-items-center 
+                                            {% if opt.is_correct %}bg-success bg-opacity-10 border-success text-success fw-bold
+                                            {% elif opt.option_letter == a.selected_option_letter %}bg-danger bg-opacity-10 border-danger text-danger
+                                            {% else %}bg-light text-muted{% endif %}">
+                                            <div>
+                                                <span class="badge bg-secondary me-2">{{ opt.option_letter }}</span>
+                                                {{ opt.option_text }}
+                                            </div>
+                                            <div>
+                                                {% if opt.option_letter == a.selected_option_letter and opt.is_correct %}
+                                                    <span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>Your Answer (Correct)</span>
+                                                {% elif opt.option_letter == a.selected_option_letter %}
+                                                    <span class="badge bg-danger"><i class="bi bi-x-lg me-1"></i>Your Answer</span>
+                                                {% elif opt.is_correct %}
+                                                    <span class="badge bg-success-subtle text-success border border-success">Correct Answer</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% if a.question.explanation %}
+                                <div class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i><em>{{ a.question.explanation }}</em></div>
+                                {% endif %}
+
+                                {% elif a.question.question_type == 'THEORY' %}
+                                <div class="mb-2">
+                                    <small class="text-muted fw-semibold d-block">Your Submitted Sentence / Answer:</small>
+                                    <div class="p-2 border rounded bg-white small font-monospace mt-1">
+                                        {{ a.theory_answer|default:"(No answer submitted)" }}
+                                    </div>
+                                </div>
+                                <div class="mb-2">
+                                    <small class="text-muted fw-semibold d-block">Required Key Word(s):</small>
+                                    <code class="text-primary">{{ a.question.keywords }}</code>
+                                </div>
+                                {% if a.question.explanation %}
+                                <div class="small text-muted mt-1"><i class="bi bi-info-circle me-1"></i><em>Model Explanation: {{ a.question.explanation }}</em></div>
+                                {% endif %}
+
+                                {% elif a.question.question_type == 'CODING' %}
+                                <div class="mb-2">
+                                    <small class="text-muted fw-semibold d-block">Your Submitted Solution:</small>
+                                    <pre class="bg-dark text-light p-2 rounded small mt-1 font-monospace mb-0" style="max-height: 200px;"><code>{{ a.submitted_code|default:"# No code submitted" }}</code></pre>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-center text-muted py-4">No detailed answers recorded for this session.</div>
+                        {% endfor %}
+                    </div>
+                    <div class="modal-footer bg-light d-flex justify-content-between align-items-center">
+                        <a href="{% url 'download_qa_sheet_pdf' r.id %}" class="btn btn-success text-white" target="_blank" download>
+                            <i class="bi bi-file-earmark-pdf-fill me-1"></i>Download PDF Q&amp;A Sheet
+                        </a>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Retake Request Modal -->
+        <div class="modal fade" id="retakeModal{{ r.exam.id }}" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title"><i class="bi bi-arrow-repeat me-2"></i>Request Exam Retake</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form method="post" action="{% url 'request_retake' exam_id=r.exam.id %}">
+                        {% csrf_token %}
+                        <div class="modal-body">
+                            <p class="mb-3">
+                                Request a retake for <strong>{{ r.exam.title }}</strong>.
+                                Your request will be reviewed by the Super Admin.
+                            </p>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Reason for Retake <span class="text-danger">*</span></label>
+                                <textarea name="reason" class="form-control" rows="3" required placeholder="Please explain why you need to retake this exam..."></textarea>
+                            </div>
+                            <div class="alert alert-info py-2 small mb-0">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Only the Super Admin can approve retake requests. Once approved, your previous result will be cleared and you can retake the exam.
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i>Submit Request</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

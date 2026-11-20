@@ -2,7 +2,7 @@
 
 **Official Branding**: PUMO TECHNOVATION EXAM PORTAL  
 **Branch**: POONAMALLEE  
-**Developed By**: **SARATHY & THIRUMAL**  
+**Developed By**: **Team SAT**  
 **Copyright**: © 2026 PUMO TECHNOVATION. All Rights Reserved.  
 **Theme**: Professional Blue  
 
@@ -171,6 +171,6 @@ Every page on this platform features the required corporate footer:
 
 ```
 PUMO TECHNOVATION EXAM PORTAL – POONAMALLEE
-Developed By SARATHY & THIRUMAL
+Developed By Team SAT
 © 2026 PUMO TECHNOVATION. All Rights Reserved.
 ```

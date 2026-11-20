@@ -1,6 +1,6 @@
 {% extends 'base/base.html' %}
 
-{% block title %}Login - PUMO Technovation Exam Portal{% endblock %}
+{% block title %}Login - SATX Exam Portal{% endblock %}
 
 {% block content %}
 <div class="container py-5">
@@ -10,14 +10,11 @@
                 <div class="card-body p-4 p-md-5">
                     <!-- Branding Header -->
                     <div class="text-center mb-4">
-                        <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3" style="width: 70px; height: 70px;">
-                            <i class="bi bi-shield-lock-fill fs-2"></i>
-                        </div>
-                        <h3 class="fw-bold text-primary mb-1">PUMO TECHNOVATION</h3>
+                        <img src="/static/images/satx_logo.png?v=2026.4" alt="SATX Logo" class="mb-3" style="width: 90px; height: 90px; object-fit: contain; background: transparent; padding: 4px;">
+                        <h3 class="fw-bold text-primary mb-1">SATX</h3>
                         <h6 class="text-uppercase tracking-wider text-secondary fw-semibold mb-1" style="color: #0f4c81 !important; letter-spacing: 2px;">
                             EXAM PORTAL
                         </h6>
-                        <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-1 rounded-pill">POONAMALLEE</span>
                     </div>
 
                     <!-- Login Form -->
@@ -47,29 +44,13 @@
                                 <input type="checkbox" class="form-check-input" id="remember_me" name="remember_me">
                                 <label class="form-check-label small" for="remember_me">Remember me</label>
                             </div>
-                            <span class="text-muted small">Poonamallee Branch</span>
+                            <span class="text-muted small">Online Assessment Portal</span>
                         </div>
 
                         <button type="submit" class="btn btn-pumo w-100 py-2 fs-6 shadow-sm">
                             <i class="bi bi-box-arrow-in-right me-2"></i>Sign In to Portal
                         </button>
                     </form>
-
-                    <!-- Quick Demo Credentials Helpers -->
-                    <div class="mt-4 pt-3 border-top text-center">
-                        <small class="text-muted d-block mb-2 fw-semibold">Quick Demo Logins (Click to autofill):</small>
-                        <div class="d-flex flex-wrap gap-2 justify-content-center">
-                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="autofill('admin', 'Sarathy@123')">
-                                <i class="bi bi-shield-fill me-1"></i>Super Admin
-                            </button>
-                            <button type="button" class="btn btn-sm btn-outline-info" onclick="autofill('trainer', 'Trainer@123')">
-                                <i class="bi bi-person-badge-fill me-1"></i>Trainer
-                            </button>
-                            <button type="button" class="btn btn-sm btn-outline-success" onclick="autofill('student', 'Student@123')">
-                                <i class="bi bi-mortarboard-fill me-1"></i>Student
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -90,11 +71,5 @@
         toggleIcon.classList.toggle('bi-eye');
         toggleIcon.classList.toggle('bi-eye-slash');
     });
-
-    // Helper for fast demo login
-    function autofill(u, p) {
-        document.getElementById('username').value = u;
-        document.getElementById('password').value = p;
-    }
 </script>
 {% endblock %}

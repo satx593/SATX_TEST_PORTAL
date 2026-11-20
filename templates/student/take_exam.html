@@ -19,7 +19,7 @@
             <div class="d-flex align-items-center gap-2 gap-md-3">
                 <!-- Warnings Counter Badge (Max 3) -->
                 <span class="badge px-3 py-2 fs-6 shadow-sm" id="warningBadge" style="background-color: #10b981; color: white;">
-                    <i class="bi bi-shield-exclamation me-1"></i>Warnings: <span id="warningCounter">0</span> / 3
+                    <i class="bi bi-shield-exclamation me-1"></i>Warnings: <span id="warningCounter">0</span> / 2
                 </span>
 
                 <span class="badge bg-light text-muted border d-none d-sm-inline" id="autoSaveIndicator">
@@ -46,7 +46,7 @@
                 <div class="card-header card-header-pumo d-flex justify-content-between align-items-center">
                     <span class="fw-bold text-primary fs-6" id="questionNumberHeader">Question 1</span>
                     <div>
-                        <span class="badge bg-light text-primary border me-2" id="questionMarksBadge">2 Marks</span>
+                        <span class="badge bg-light text-primary border me-2" id="questionMarksBadge">1 Mark</span>
                         <button type="button" class="btn btn-sm btn-outline-warning" id="markReviewBtn" onclick="toggleReview()">
                             <i class="bi bi-flag me-1"></i>Mark for Review
                         </button>
@@ -138,7 +138,7 @@
         </p>
         <div class="alert alert-warning py-2 small mb-4 text-start">
             <i class="bi bi-exclamation-triangle-fill me-1 text-danger"></i>
-            <strong>Zero-Tolerance Tab-Switch Rule:</strong> You are granted a maximum of <strong>3 warnings</strong>. Any tab switch above 3 warnings will result in immediate disqualification and auto-submission.
+            <strong>Zero-Tolerance Tab-Switch Rule:</strong> You are granted a maximum of <strong>2 warnings</strong>. Any tab switch above 2 warnings will result in immediate disqualification and auto-submission.
         </div>
         <button type="button" class="btn btn-pumo py-2 fs-6 shadow w-100" onclick="enterFullscreen()">
             <i class="bi bi-fullscreen me-2"></i>Resume / Enter Fullscreen Mode
@@ -146,7 +146,7 @@
     </div>
 </div>
 
-<!-- 2. Tab Switch Warning Modal (1 of 3, 2 of 3, 3 of 3) -->
+<!-- 2. Tab Switch Warning Modal (1 of 2, 2 of 2) -->
 <div class="modal fade" id="tabWarningModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-danger shadow-lg">
@@ -176,7 +176,7 @@
     </div>
 </div>
 
-<!-- 3. Expelled Modal (Above 3 Warnings -> Auto Expel) -->
+<!-- 3. Expelled Modal (Above 2 Warnings -> Auto Expel) -->
 <div class="modal fade" id="expelledModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-danger shadow-lg">
@@ -191,11 +191,11 @@
                 </div>
                 <h4 class="fw-bold text-danger mb-2">Expelled from Examination Platform</h4>
                 <p class="text-secondary mb-3">
-                    You have exceeded the maximum allowed limit of <strong>3 tab-switching warnings</strong>. 
+                    You have exceeded the maximum allowed limit of <strong>2 tab-switching warnings</strong>. 
                     Your examination has been automatically submitted and terminated.
                 </p>
                 <div class="alert alert-danger py-2 small mb-3 text-start">
-                    <div><strong>Violation:</strong> Exceeded 3 Tab-Switch Warnings</div>
+                    <div><strong>Violation:</strong> Exceeded 2 Tab-Switch Warnings</div>
                     <div><strong>Action:</strong> Disqualified / Automatic Submission</div>
                 </div>
                 <div class="spinner-border text-danger mt-2" role="status">
@@ -235,6 +235,15 @@
             </div>
         </div>
     </div>
+<!-- Floating AI Camera Focus Alert Banner -->
+<div id="cameraFocusBanner" class="position-fixed shadow-lg text-center" style="display:none; top: 18px; left: 50%; transform: translateX(-50%); z-index: 99999; background: linear-gradient(135deg, #b91c1c, #dc2626); color: #ffffff; border-radius: 12px; padding: 12px 28px; border: 2px solid #f87171; box-shadow: 0 10px 25px rgba(220,38,38,0.5); min-width: 380px;">
+    <div class="d-flex align-items-center justify-content-center gap-3">
+        <i class="bi bi-camera-video-off-fill fs-3 text-warning"></i>
+        <div class="text-start">
+            <strong class="d-block text-white" style="font-size: 1.05rem;"><i class="bi bi-exclamation-triangle-fill me-1 text-warning"></i>Please Focus on Camera!</strong>
+            <small style="font-size: 0.85rem; opacity: 0.95;" id="cameraFocusBannerDetail">Keep your face centered and clearly visible on screen.</small>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -249,16 +258,18 @@
     const reviewStatus = {};
     let isExamSubmitted = false;
 
-    // Warning System State (Max 3 Warnings)
+    // Warning System State (Max 2 Warnings)
     let warningCount = {{ initial_tab_switches|default:0 }};
-    const MAX_WARNINGS = 3;
+    const MAX_WARNINGS = 2;
     let lastTabSwitchTime = 0;
     const tabWarningModal = new bootstrap.Modal(document.getElementById('tabWarningModal'));
     const expelledModal = new bootstrap.Modal(document.getElementById('expelledModal'));
 
     // Initialize saved answers
+    const theoryAnswers = {};
     questions.forEach((q, idx) => {
         studentAnswers[q.id] = q.saved_answer || '';
+        theoryAnswers[q.id] = q.saved_theory_answer || '';
         reviewStatus[q.id] = false;
     });
 
@@ -331,15 +342,13 @@
         if (warningCount === 0) {
             badge.style.backgroundColor = '#10b981'; // Green
         } else if (warningCount === 1) {
-            badge.style.backgroundColor = '#f59e0b'; // Yellow
-        } else if (warningCount === 2) {
             badge.style.backgroundColor = '#ea580c'; // Orange
-        } else if (warningCount >= 3) {
+        } else if (warningCount >= 2) {
             badge.style.backgroundColor = '#dc2626'; // Red
         }
     }
 
-    // 4. Tab Switch Handler (3 Warnings System + Expulsion Above 3)
+    // 4. Tab Switch Handler (2 Warnings System + Expulsion Above 2)
     function handleTabSwitch(eventType, details) {
         if (isExamSubmitted) return;
 
@@ -356,37 +365,33 @@
         logProctoringEvent(eventType, `${details} (Violation #${warningCount})`);
 
         if (warningCount > MAX_WARNINGS) {
-            // Above 3 warnings -> EXPELLED IMMEDIATELY!
+            // Above 2 warnings -> EXPELLED IMMEDIATELY!
             isExamSubmitted = true;
             expelledModal.show();
-            document.getElementById('proctorAlertMsg').innerHTML = '<span class="text-danger fw-bold"><i class="bi bi-x-octagon-fill me-1"></i>EXPELLED: Exceeded 3 Warnings</span>';
+            document.getElementById('proctorAlertMsg').innerHTML = '<span class="text-danger fw-bold"><i class="bi bi-x-octagon-fill me-1"></i>EXPELLED: Exceeded 2 Warnings</span>';
             setTimeout(function() {
                 window.location.href = "{% url 'submit_exam' session_id=session.id %}?reason=tab_switch_violation";
             }, 2500);
             return;
         }
 
-        // Show Warning Modal for 1, 2, or 3
+        // Show Warning Modal for 1 or 2
         const titleEl = document.getElementById('tabWarningTitle');
         const headingEl = document.getElementById('tabWarningHeading');
         const remainingEl = document.getElementById('tabWarningRemaining');
 
         if (warningCount === 1) {
-            titleEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>Warning 1 of 3: Tab Switching Detected!';
+            titleEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>Warning 1 of 2: Tab Switching Detected!';
             headingEl.innerText = 'First Tab Switch Warning';
-            remainingEl.innerHTML = 'You have <strong>2 warnings remaining</strong> before your exam is automatically terminated!';
+            remainingEl.innerHTML = 'You have <strong>1 warning remaining</strong> before your exam is automatically terminated!';
         } else if (warningCount === 2) {
-            titleEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>Warning 2 of 3: Tab Switching Detected!';
-            headingEl.innerText = 'Second Tab Switch Warning';
-            remainingEl.innerHTML = 'You have <strong>ONLY 1 warning remaining</strong>! Any further switch will lead to expulsion.';
-        } else if (warningCount === 3) {
-            titleEl.innerHTML = '<i class="bi bi-shield-fill-x me-2"></i>FINAL WARNING (3 of 3): Tab Switching Detected!';
+            titleEl.innerHTML = '<i class="bi bi-shield-fill-x me-2"></i>FINAL WARNING (2 of 2): Tab Switching Detected!';
             headingEl.innerText = 'FINAL WARNING: Maximum Violations Reached!';
             remainingEl.innerHTML = '<span class="text-danger fs-6 fw-bold">THIS IS YOUR LAST WARNING. Switching tabs one more time will permanently expel you from this examination platform!</span>';
         }
 
         tabWarningModal.show();
-        document.getElementById('proctorAlertMsg').innerHTML = `<span class="text-danger fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i>Warning ${warningCount}/3 Triggered</span>`;
+        document.getElementById('proctorAlertMsg').innerHTML = `<span class="text-danger fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i>Warning ${warningCount}/2 Triggered</span>`;
     }
 
     function dismissTabWarning() {
@@ -407,11 +412,11 @@
         }
     });
 
-    // Anti-Cheat Restrictions
-    document.addEventListener('contextmenu', e => e.preventDefault());
-    document.addEventListener('copy', e => e.preventDefault());
-    document.addEventListener('paste', e => e.preventDefault());
-    document.addEventListener('cut', e => e.preventDefault());
+    // Anti-Cheat Restrictions (allow paste in code editor textareas)
+    document.addEventListener('contextmenu', e => { if (!e.target.classList.contains('font-monospace')) e.preventDefault(); });
+    document.addEventListener('copy', e => { if (!e.target.classList.contains('font-monospace')) e.preventDefault(); });
+    document.addEventListener('paste', e => { if (!e.target.classList.contains('font-monospace')) e.preventDefault(); });
+    document.addEventListener('cut', e => { if (!e.target.classList.contains('font-monospace')) e.preventDefault(); });
 
     // 5. Countdown Timer
     function updateTimer() {
@@ -441,27 +446,139 @@
         document.getElementById('questionMarksBadge').innerText = `${q.marks} Marks`;
         document.getElementById('questionTextDisplay').innerText = q.text;
 
-        // Render Options
         const container = document.getElementById('optionsContainer');
         container.innerHTML = '';
 
-        q.options.forEach(opt => {
-            const isSelected = (studentAnswers[q.id] === opt.letter);
-            const optDiv = document.createElement('div');
-            optDiv.className = `p-3 border rounded-3 cursor-pointer d-flex align-items-center transition ${isSelected ? 'border-primary bg-primary bg-opacity-10' : 'bg-white'}`;
-            optDiv.style.cursor = 'pointer';
-            optDiv.onclick = () => selectOption(q.id, opt.letter);
+        if (q.type === 'CODING') {
+            // ── CODING IDE ──────────────────────────────────────────────
+            container.innerHTML = `
+            <div class="mb-2 d-flex flex-wrap gap-2 align-items-center">
+                <strong class="text-primary"><i class="bi bi-code-slash me-1"></i>Language:</strong>
+                <div class="btn-group" role="group">
+                    <input type="radio" class="btn-check" name="lang_${q.id}" id="lang_py_${q.id}" value="python" checked>
+                    <label class="btn btn-sm btn-outline-primary" for="lang_py_${q.id}">🐍 Python</label>
+                    <input type="radio" class="btn-check" name="lang_${q.id}" id="lang_java_${q.id}" value="java">
+                    <label class="btn btn-sm btn-outline-warning" for="lang_java_${q.id}">☕ Java</label>
+                </div>
+                <span class="ms-auto badge bg-secondary" id="codeStatus_${q.id}">Ready</span>
+            </div>
 
-            optDiv.innerHTML = `
-                <div class="form-check w-100">
-                    <input class="form-check-input" type="radio" name="option_${q.id}" id="opt_${q.id}_${opt.letter}" value="${opt.letter}" ${isSelected ? 'checked' : ''}>
-                    <label class="form-check-label w-100 ms-2 fw-semibold" for="opt_${q.id}_${opt.letter}" style="cursor: pointer;">
-                        <span class="badge bg-secondary me-2">${opt.letter}</span> ${opt.text}
+            ${q.input_format ? `<div class="alert alert-light border py-1 px-2 small mb-2"><strong>Input Format:</strong> ${q.input_format}</div>` : ''}
+            ${q.output_format ? `<div class="alert alert-light border py-1 px-2 small mb-2"><strong>Output Format:</strong> ${q.output_format}</div>` : ''}
+
+            <div class="border rounded overflow-hidden mb-2 shadow-sm">
+                <div class="bg-dark px-3 py-1 d-flex justify-content-between align-items-center">
+                    <small class="text-light fw-semibold"><i class="bi bi-terminal me-1"></i>Code Editor</small>
+                    <button class="btn btn-sm btn-outline-light py-0 px-2" onclick="clearCode(${q.id})" title="Clear">
+                        <i class="bi bi-eraser"></i>
+                    </button>
+                </div>
+                <textarea id="codeEditor_${q.id}" class="form-control font-monospace border-0 rounded-0"
+                    rows="14" style="font-size:0.88rem; background:#1e1e1e; color:#d4d4d4; resize:vertical; tab-size:4;"
+                    placeholder="# Write your solution here..."
+                    onkeydown="handleCodeTab(event)"
+                    oninput="saveCode(${q.id})">${(window.savedCode && window.savedCode[q.id]) || getDefaultBoilerplate(document.querySelector('input[name=lang_${q.id}]:checked')?.value || 'python')}</textarea>
+            </div>
+
+            <div class="row g-2 mb-2">
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold text-muted">Custom Input (stdin)</label>
+                    <textarea id="customInput_${q.id}" class="form-control font-monospace" rows="2"
+                        style="font-size:0.85rem;" placeholder="Enter input here...">${q.sample_input}</textarea>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold text-muted">Output</label>
+                    <div id="codeOutput_${q.id}" class="font-monospace border rounded p-2 bg-light" style="min-height:66px; font-size:0.85rem; white-space:pre-wrap;">Click Run to see output...</div>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mb-2">
+                <button class="btn btn-sm btn-primary" onclick="runCode(${q.id}, 'run')">
+                    <i class="bi bi-play-fill me-1"></i>Run Code
+                </button>
+                <button class="btn btn-sm btn-success" onclick="runCode(${q.id}, 'sample')">
+                    <i class="bi bi-check2-circle me-1"></i>Run Sample Test
+                </button>
+                ${q.hidden_input ? `
+                <button class="btn btn-sm btn-warning" onclick="runCode(${q.id}, 'hidden')">
+                    <i class="bi bi-shield-check me-1"></i>Run Hidden Test
+                </button>` : ''}
+            </div>
+
+            ${q.sample_input ? `
+            <div class="row g-2 mt-1">
+                <div class="col-md-4">
+                    <div class="border rounded p-2 bg-light small">
+                        <strong class="d-block text-muted mb-1">Sample Input</strong>
+                        <code class="text-dark" style="white-space:pre-wrap;">${q.sample_input}</code>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="border rounded p-2 bg-light small">
+                        <strong class="d-block text-muted mb-1">Expected Output</strong>
+                        <code class="text-success" style="white-space:pre-wrap;">${q.sample_output}</code>
+                    </div>
+                </div>
+                <div class="col-md-4" id="sampleResult_${q.id}">
+                    <div class="border rounded p-2 bg-light small text-muted">
+                        <strong class="d-block mb-1">Test Result</strong>
+                        <span>Not run yet</span>
+                    </div>
+                </div>
+            </div>` : ''}
+            `;
+
+            // Set up language change → update boilerplate
+            document.querySelectorAll(`input[name="lang_${q.id}"]`).forEach(radio => {
+                radio.addEventListener('change', function() {
+                    const editor = document.getElementById(`codeEditor_${q.id}`);
+                    if (!window.savedCode || !window.savedCode[q.id]) {
+                        editor.value = getDefaultBoilerplate(this.value);
+                    }
+                });
+            });
+
+        } else if (q.type === 'THEORY') {
+            // ── THEORY QUESTION: sentence / paragraph typing ──────────────
+            const currentTheory = theoryAnswers[q.id] || '';
+            container.innerHTML = `
+                <div class="card p-3 border rounded-3 bg-light shadow-sm">
+                    <label class="form-label fw-bold text-primary mb-2">
+                        <i class="bi bi-pencil-square me-1"></i>Type your answer in full sentence(s):
                     </label>
+                    <textarea class="form-control bg-white font-sans" id="theory_input_${q.id}" rows="6"
+                        placeholder="Write your explanation or answer sentence here..."
+                        style="resize: vertical; font-size: 0.95rem; line-height: 1.6;"
+                        oninput="handleTheoryChange(${q.id}, this.value)">${escHtml(currentTheory)}</textarea>
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Your response is automatically saved as you type.</small>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearTheoryAnswer(${q.id})">
+                            <i class="bi bi-eraser me-1"></i>Clear Answer
+                        </button>
+                    </div>
                 </div>
             `;
-            container.appendChild(optDiv);
-        });
+
+        } else {
+            // ── MCQ Options ───────────────────────────────────────────────
+            q.options.forEach(opt => {
+                const isSelected = (studentAnswers[q.id] === opt.letter);
+                const optDiv = document.createElement('div');
+                optDiv.className = `p-3 border rounded-3 cursor-pointer d-flex align-items-center transition ${isSelected ? 'border-primary bg-primary bg-opacity-10' : 'bg-white'}`;
+                optDiv.style.cursor = 'pointer';
+                optDiv.onclick = () => selectOption(q.id, opt.letter);
+
+                optDiv.innerHTML = `
+                    <div class="form-check w-100">
+                        <input class="form-check-input" type="radio" name="option_${q.id}" id="opt_${q.id}_${opt.letter}" value="${opt.letter}" ${isSelected ? 'checked' : ''}>
+                        <label class="form-check-label w-100 ms-2 fw-semibold" for="opt_${q.id}_${opt.letter}" style="cursor: pointer;">
+                            <span class="badge bg-secondary me-2">${opt.letter}</span> ${opt.text}
+                        </label>
+                    </div>
+                `;
+                container.appendChild(optDiv);
+            });
+        }
 
         // Update Review button label
         const revBtn = document.getElementById('markReviewBtn');
@@ -480,7 +597,139 @@
         renderPalette();
     }
 
+    // ── Coding IDE helpers ──────────────────────────────────────────────
+    window.savedCode = {};
+
+    function saveCode(qId) {
+        if (!window.savedCode) window.savedCode = {};
+        const editor = document.getElementById(`codeEditor_${qId}`);
+        if (editor) {
+            window.savedCode[qId] = editor.value;
+            studentAnswers[qId] = editor.value;
+            autoSave(qId, '');
+        }
+    }
+
+    function clearCode(qId) {
+        const editor = document.getElementById(`codeEditor_${qId}`);
+        if (editor) {
+            editor.value = '';
+            window.savedCode[qId] = '';
+            studentAnswers[qId] = '';
+            autoSave(qId, '');
+        }
+    }
+
+    function handleCodeTab(e) {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const ta = e.target;
+            const start = ta.selectionStart;
+            const end = ta.selectionEnd;
+            ta.value = ta.value.substring(0, start) + '    ' + ta.value.substring(end);
+            ta.selectionStart = ta.selectionEnd = start + 4;
+        }
+    }
+
+    function getDefaultBoilerplate(lang) {
+        if (lang === 'java') {
+            return `import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n        // TODO: Write your solution\n    }\n}`;
+        }
+        return `# Write your Python solution here\n\nn = int(input())\n# TODO: Write your logic\n`;
+    }
+
+    function getLang(qId) {
+        const sel = document.querySelector(`input[name="lang_${qId}"]:checked`);
+        return sel ? sel.value : 'python';
+    }
+
+    function runCode(qId, mode) {
+        const editor = document.getElementById(`codeEditor_${qId}`);
+        const code = editor ? editor.value : '';
+        const lang = getLang(qId);
+        const customInput = document.getElementById(`customInput_${qId}`)?.value || '';
+        const outputBox = document.getElementById(`codeOutput_${qId}`);
+        const statusBadge = document.getElementById(`codeStatus_${qId}`);
+        const sampleResult = document.getElementById(`sampleResult_${qId}`);
+
+        const q = questions[currentIndex];
+        let stdinInput = customInput;
+        let expectedOutput = '';
+
+        if (mode === 'sample') { stdinInput = q.sample_input; expectedOutput = q.sample_output; }
+        if (mode === 'hidden') { stdinInput = q.hidden_input; expectedOutput = q.hidden_output; }
+
+        statusBadge.className = 'ms-auto badge bg-warning text-dark';
+        statusBadge.innerText = 'Running…';
+        outputBox.innerHTML = '<span class="text-muted"><i class="bi bi-hourglass-split me-1"></i>Executing…</span>';
+
+        fetch("{% url 'run_code_api' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, language: lang, input: stdinInput, mode, expected_output: expectedOutput })
+        })
+        .then(r => r.json())
+        .then(data => {
+            const out = data.stdout || '';
+            const err = data.stderr || '';
+            const isOk = data.exit_code === 0 && !err;
+
+            statusBadge.className = `ms-auto badge ${isOk ? 'bg-success' : 'bg-danger'}`;
+            statusBadge.innerText = isOk ? 'Success' : (data.status === 'compile_error' ? 'Compile Error' : 'Runtime Error');
+
+            let html = '';
+            if (out) html += `<span class="text-success">${escHtml(out)}</span>`;
+            if (err) html += `<span class="text-danger">${escHtml(err)}</span>`;
+            if (!out && !err) html = '<span class="text-muted">No output produced.</span>';
+            outputBox.innerHTML = html;
+
+            if (mode !== 'run' && sampleResult) {
+                const passed = data.passed;
+                sampleResult.innerHTML = `
+                    <div class="border rounded p-2 small ${passed ? 'bg-success-subtle border-success' : 'bg-danger-subtle border-danger'}">
+                        <strong class="d-block mb-1 ${passed ? 'text-success' : 'text-danger'}">
+                            ${passed ? '✅ TEST PASSED' : '❌ TEST FAILED'}
+                        </strong>
+                        <div>Your Output: <code>${escHtml(data.actual_output)}</code></div>
+                        ${!passed ? `<div>Expected: <code>${escHtml(expectedOutput)}</code></div>` : ''}
+                    </div>`;
+            }
+
+            // Auto-save code answer for CODING questions
+            saveCode(qId);
+        })
+        .catch(err => {
+            statusBadge.className = 'ms-auto badge bg-danger';
+            statusBadge.innerText = 'Error';
+            outputBox.innerHTML = `<span class="text-danger">Network error: ${err.message}</span>`;
+        });
+    }
+
+    function escHtml(str) {
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+
+
     // 7. Select Option & Auto-Save
+    let theorySaveTimer = null;
+    function handleTheoryChange(qId, val) {
+        theoryAnswers[qId] = val;
+        clearTimeout(theorySaveTimer);
+        theorySaveTimer = setTimeout(() => {
+            autoSave(qId, '');
+            renderPalette();
+        }, 500);
+    }
+
+    function clearTheoryAnswer(qId) {
+        theoryAnswers[qId] = '';
+        const el = document.getElementById(`theory_input_${qId}`);
+        if (el) el.value = '';
+        autoSave(qId, '');
+        renderPalette();
+    }
+
     function selectOption(qId, letter) {
         studentAnswers[qId] = letter;
         renderQuestion(currentIndex);
@@ -490,6 +739,7 @@
     function clearAnswer() {
         const qId = questions[currentIndex].id;
         studentAnswers[qId] = '';
+        theoryAnswers[qId] = '';
         renderQuestion(currentIndex);
         autoSave(qId, '');
     }
@@ -505,6 +755,9 @@
         const indicator = document.getElementById('autoSaveIndicator');
         indicator.innerHTML = '<i class="bi bi-arrow-repeat spin text-primary me-1"></i>Saving...';
 
+        const currentCode = (window.savedCode && window.savedCode[qId]) || 
+                            document.getElementById(`codeEditor_${qId}`)?.value || '';
+
         fetch("{% url 'save_answer_api' %}", {
             method: 'POST',
             headers: {
@@ -514,6 +767,8 @@
                 session_id: sessionId,
                 question_id: qId,
                 selected_option: optionLetter,
+                theory_answer: (theoryAnswers && theoryAnswers[qId]) || '',
+                submitted_code: currentCode,
                 is_review: reviewStatus[qId]
             })
         })
@@ -537,9 +792,13 @@
             btn.innerText = idx + 1;
 
             let statusClass = 'palette-unanswered';
+            const hasAnswer = (q.type === 'THEORY')
+                ? !!(theoryAnswers[q.id] && theoryAnswers[q.id].trim())
+                : (q.type === 'CODING' ? !!((window.savedCode && window.savedCode[q.id]) || studentAnswers[q.id]) : !!studentAnswers[q.id]);
+
             if (reviewStatus[q.id]) {
                 statusClass = 'palette-review';
-            } else if (studentAnswers[q.id]) {
+            } else if (hasAnswer) {
                 statusClass = 'palette-answered';
             }
 
@@ -581,12 +840,96 @@
         modal.show();
     }
 
-    // 9. AI Webcam Stream
+    // 9. AI Webcam Stream & Real-time Vision Focus Proctoring
     const video = document.getElementById('proctorWebcam');
+    const cameraBanner = document.getElementById('cameraFocusBanner');
+    const cameraBannerDetail = document.getElementById('cameraFocusBannerDetail');
+    const proctorAlertMsg = document.getElementById('proctorAlertMsg');
+
+    let cameraCheckInterval = null;
+    let lastCamWarningTime = 0;
+
+    function showCameraFocusWarning(type, message) {
+        const now = Date.now();
+        if (cameraBannerDetail) cameraBannerDetail.innerText = message;
+        if (cameraBanner) cameraBanner.style.display = 'block';
+        if (proctorAlertMsg) {
+            proctorAlertMsg.innerHTML = `<span class="text-danger fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i>Please Focus on Camera</span>`;
+        }
+
+        if (now - lastCamWarningTime > 5000) {
+            lastCamWarningTime = now;
+            playWarningBeep();
+            logProctoringEvent(type, message);
+        }
+    }
+
+    function hideCameraFocusWarning() {
+        if (cameraBanner) cameraBanner.style.display = 'none';
+        if (proctorAlertMsg) {
+            proctorAlertMsg.innerHTML = `<span class="text-success small"><i class="bi bi-check-circle-fill me-1"></i>Face detected &amp; focused</span>`;
+        }
+    }
+
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ video: true })
-            .then(stream => { video.srcObject = stream; })
-            .catch(err => { logProctoringEvent('WEBCAM_DISCONNECTED', 'Candidate camera access blocked or revoked'); });
+            .then(stream => {
+                video.srcObject = stream;
+                // Start real-time frame analyzer canvas
+                const canvas = document.createElement('canvas');
+                canvas.width = 64;
+                canvas.height = 48;
+                const ctx = canvas.getContext('2d');
+                let prevData = null;
+
+                cameraCheckInterval = setInterval(() => {
+                    if (isExamSubmitted) { clearInterval(cameraCheckInterval); return; }
+                    if (video.readyState < 2) return;
+
+                    ctx.drawImage(video, 0, 0, 64, 48);
+                    const imgData = ctx.getImageData(0, 0, 64, 48).data;
+                    let totalBrightness = 0;
+                    let skinPixels = 0;
+                    let pixelDiff = 0;
+                    const totalPixels = 64 * 48;
+
+                    for (let i = 0; i < imgData.length; i += 4) {
+                        const r = imgData[i];
+                        const g = imgData[i+1];
+                        const b = imgData[i+2];
+                        const brightness = (r + g + b) / 3;
+                        totalBrightness += brightness;
+
+                        // Skin-tone pixel detection heuristic
+                        if (r > 60 && g > 40 && b > 20 && r > g && r > b && (r - g) > 15) {
+                            skinPixels++;
+                        }
+
+                        if (prevData) {
+                            const diff = Math.abs(r - prevData[i]) + Math.abs(g - prevData[i+1]) + Math.abs(b - prevData[i+2]);
+                            if (diff > 80) pixelDiff++;
+                        }
+                    }
+
+                    const avgBrightness = totalBrightness / totalPixels;
+                    const skinRatio = skinPixels / totalPixels;
+                    prevData = imgData;
+
+                    if (avgBrightness < 12) {
+                        showCameraFocusWarning('FACE_ABSENT', 'Please focus on camera! Camera is covered or dark.');
+                    } else if (skinRatio < 0.02) {
+                        showCameraFocusWarning('FACE_ABSENT', 'Please focus on camera! No face detected in front of screen.');
+                    } else if (pixelDiff > (totalPixels * 0.55)) {
+                        showCameraFocusWarning('MULTIPLE_FACES', 'Please focus on camera! Multiple persons or movement detected.');
+                    } else {
+                        hideCameraFocusWarning();
+                    }
+                }, 2200);
+            })
+            .catch(err => {
+                showCameraFocusWarning('WEBCAM_DISCONNECTED', 'Camera access blocked! Please enable your webcam.');
+                logProctoringEvent('WEBCAM_DISCONNECTED', 'Candidate camera access blocked or revoked');
+            });
     }
 
     function logProctoringEvent(type, details) {
@@ -608,7 +951,8 @@
                     window.location.href = "{% url 'submit_exam' session_id=session.id %}?reason=tab_switch_violation";
                 }, 2000);
             }
-        });
+        })
+        .catch(() => {});
     }
 
     // Initial render

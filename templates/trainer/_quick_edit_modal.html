@@ -1,0 +1,461 @@
+<!-- Quick Edit Question Modal for Exam Creation & Editing -->
+<div class="modal fade" id="quickEditQuestionModal" tabindex="-1" aria-labelledby="quickEditQuestionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold" id="quickEditQuestionModalLabel">
+                    <i class="bi bi-pencil-square me-2"></i>Edit Question <span id="qe_modal_qid_badge" class="badge bg-light text-primary ms-1"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <!-- Loading Indicator -->
+            <div id="qe_loading_spinner" class="p-5 text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading question data...</span>
+                </div>
+                <div class="mt-2 text-muted fw-semibold">Loading question details...</div>
+            </div>
+
+            <!-- Form Body -->
+            <form id="quickEditQuestionForm" style="display: none; flex-direction: column; overflow: hidden; height: 100%; margin: 0;" onsubmit="handleQuickEditSubmit(event)">
+                {% csrf_token %}
+                <input type="hidden" id="qe_question_id" name="question_id">
+                <input type="hidden" name="is_ajax" value="true">
+
+                <div class="modal-body p-4" style="overflow-y: auto; max-height: calc(90vh - 130px);">
+                    <div id="qe_alert_box" class="alert d-none mb-3 py-2 small"></div>
+
+                    <!-- Meta Information -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Course</label>
+                            <select name="course" id="qe_course" class="form-select form-select-sm">
+                                <option value="">-- General / No Course --</option>
+                                {% for c in courses %}
+                                <option value="{{ c.id }}">{{ c.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-semibold">Topic</label>
+                            <input type="text" name="topic" id="qe_topic" class="form-control form-control-sm" placeholder="e.g. Loops, Arrays">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-semibold">Difficulty</label>
+                            <select name="difficulty" id="qe_difficulty" class="form-select form-select-sm">
+                                <option value="EASY">Easy</option>
+                                <option value="MEDIUM">Medium</option>
+                                <option value="HARD">Hard</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold text-primary">Marks *</label>
+                            <input type="number" name="marks" id="qe_marks" class="form-control form-control-sm fw-bold border-primary" min="1" required>
+                        </div>
+                    </div>
+
+                    <!-- Question Text -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Question / Problem Statement *</label>
+                        <textarea class="form-control" name="question_text" id="qe_question_text" rows="3" required placeholder="Enter question statement..."></textarea>
+                    </div>
+
+                    <!-- MCQ Section -->
+                    <div id="qe_mcq_section" class="border rounded p-3 mb-3 bg-light" style="display: none;">
+                        <h6 class="fw-bold text-primary mb-2"><i class="bi bi-ui-radios me-1"></i>Multiple Choice Options</h6>
+                        <div class="row g-2">
+                            <div class="col-md-6 mb-2">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text fw-bold">A</span>
+                                    <input type="text" class="form-control" name="option_a" id="qe_opt_a" placeholder="Option A text">
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text fw-bold">B</span>
+                                    <input type="text" class="form-control" name="option_b" id="qe_opt_b" placeholder="Option B text">
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text fw-bold">C</span>
+                                    <input type="text" class="form-control" name="option_c" id="qe_opt_c" placeholder="Option C text">
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text fw-bold">D</span>
+                                    <input type="text" class="form-control" name="option_d" id="qe_opt_d" placeholder="Option D text">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mt-1">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold text-success"><i class="bi bi-check-circle-fill me-1"></i>Correct Answer</label>
+                                <select name="correct_option" id="qe_correct_option" class="form-select form-select-sm border-success">
+                                    <option value="A">Option A</option>
+                                    <option value="B">Option B</option>
+                                    <option value="C">Option C</option>
+                                    <option value="D">Option D</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label small fw-semibold">Explanation / Rationale</label>
+                                <input type="text" name="explanation" id="qe_explanation" class="form-control form-control-sm" placeholder="Why is this option correct?">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Theory Section -->
+                    <div id="qe_theory_section" class="border rounded p-3 mb-3 bg-light" style="display: none;">
+                        <h6 class="fw-bold text-primary mb-2"><i class="bi bi-file-text me-1"></i>Theory Question Evaluation Criteria</h6>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold text-primary"><i class="bi bi-key-fill me-1"></i>Required Key Word(s) *</label>
+                            <input type="text" class="form-control form-control-sm border-primary" name="keywords" id="qe_keywords" placeholder="e.g. database, primary key, sql">
+                            <small class="text-muted">Enter key words separated by commas. If these words appear in the candidate's sentence, marks will be generated automatically.</small>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Model Answer / Explanation</label>
+                            <textarea class="form-control form-control-sm" name="explanation" id="qe_theory_explanation" rows="2" placeholder="Optional reference answer or notes..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Coding Section -->
+                    <div id="qe_coding_section" class="border rounded p-3 mb-3 bg-light" style="display: none;">
+                        <h6 class="fw-bold text-success mb-2"><i class="bi bi-code-slash me-1"></i>Coding Problem Specifications</h6>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold">Input Format</label>
+                                <textarea class="form-control form-control-sm font-monospace" name="input_format" id="qe_input_format" rows="2" placeholder="e.g. Single line integer N"></textarea>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold">Output Format</label>
+                                <textarea class="form-control form-control-sm font-monospace" name="output_format" id="qe_output_format" rows="2" placeholder="e.g. Factorial of N"></textarea>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold">Constraints</label>
+                                <textarea class="form-control form-control-sm font-monospace" name="constraints" id="qe_constraints" rows="2" placeholder="e.g. 1 &lt;= N &lt;= 100"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Sample Test Cases (Multiple) -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-bold small text-primary">
+                                    <i class="bi bi-eye-fill me-1"></i>Sample Test Cases (Visible to Students)
+                                </span>
+                                <button type="button" class="btn btn-sm btn-outline-primary py-0" onclick="addQeTestCase('sample')">
+                                    <i class="bi bi-plus-circle me-1"></i>Add Sample Test Case
+                                </button>
+                            </div>
+                            <div id="qe_sample_cases_list">
+                                <!-- Dynamic rows rendered via JS -->
+                            </div>
+                        </div>
+
+                        <!-- Hidden Test Cases (Multiple) -->
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-bold small text-danger">
+                                    <i class="bi bi-shield-lock-fill me-1"></i>Hidden Test Cases (Grading / Evaluation)
+                                </span>
+                                <button type="button" class="btn btn-sm btn-outline-danger py-0" onclick="addQeTestCase('hidden')">
+                                    <i class="bi bi-plus-circle me-1"></i>Add Hidden Test Case
+                                </button>
+                            </div>
+                            <div id="qe_hidden_cases_list">
+                                <!-- Dynamic rows rendered via JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Practical Section -->
+                    <div id="qe_practical_section" class="border rounded p-3 mb-3 bg-light" style="display: none;">
+                        <h6 class="fw-bold text-warning mb-2"><i class="bi bi-tools me-1"></i>Practical Task Criteria</h6>
+                        <label class="form-label small fw-semibold">Evaluation Criteria</label>
+                        <textarea class="form-control form-control-sm" name="evaluation_criteria" id="qe_evaluation_criteria" rows="3" placeholder="Key points for evaluation..."></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light" style="flex-shrink: 0;">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" id="qe_submit_btn" class="btn btn-primary btn-sm px-4">
+                        <i class="bi bi-check2-circle me-1"></i>Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Floating Toast Notification for quick updates -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+    <div id="quickEditToast" class="toast align-items-center text-white bg-success border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body fs-6 py-2">
+                <i class="bi bi-check-circle-fill me-2"></i><span id="quickEditToastMsg">Question updated successfully!</span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentEditingQId = null;
+
+function showToastNotification(msg, isSuccess = true) {
+    const toastEl = document.getElementById('quickEditToast');
+    const toastMsg = document.getElementById('quickEditToastMsg');
+    if (!toastEl || !toastMsg) return;
+    toastMsg.textContent = msg;
+    toastEl.className = 'toast align-items-center text-white border-0 shadow ' + (isSuccess ? 'bg-success' : 'bg-danger');
+    const toast = new bootstrap.Toast(toastEl, { delay: 3500 });
+    toast.show();
+}
+
+function openQuickEditModal(questionId) {
+    currentEditingQId = questionId;
+    const modalEl = document.getElementById('quickEditQuestionModal');
+    const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    
+    // Reset views
+    document.getElementById('qe_loading_spinner').style.display = 'block';
+    document.getElementById('quickEditQuestionForm').style.display = 'none';
+    document.getElementById('qe_alert_box').className = 'alert d-none mb-3 py-2 small';
+    document.getElementById('qe_modal_qid_badge').innerText = '#' + questionId;
+    
+    bsModal.show();
+
+    fetch('/trainer/question/' + questionId + '/data/')
+        .then(res => {
+            if (!res.ok) throw new Error('Failed to load question details.');
+            return res.json();
+        })
+        .then(data => {
+            // Populate form
+            document.getElementById('qe_question_id').value = data.id;
+            document.getElementById('qe_course').value = data.course_id || '';
+            document.getElementById('qe_topic').value = data.topic || '';
+            document.getElementById('qe_difficulty').value = data.difficulty || 'MEDIUM';
+            document.getElementById('qe_marks').value = data.marks || 1;
+            document.getElementById('qe_question_text').value = data.question_text || '';
+
+            // Toggle sections
+            const mcqSection = document.getElementById('qe_mcq_section');
+            const theorySection = document.getElementById('qe_theory_section');
+            const codingSection = document.getElementById('qe_coding_section');
+            const practicalSection = document.getElementById('qe_practical_section');
+
+            mcqSection.style.display = 'none';
+            if (theorySection) theorySection.style.display = 'none';
+            codingSection.style.display = 'none';
+            practicalSection.style.display = 'none';
+
+            if (data.question_type === 'MCQ_SINGLE') {
+                mcqSection.style.display = 'block';
+                // Reset options
+                ['a', 'b', 'c', 'd'].forEach(let => {
+                    document.getElementById('qe_opt_' + let).value = '';
+                });
+                let correctOpt = 'A';
+                (data.options || []).forEach(opt => {
+                    const l = (opt.letter || '').toLowerCase();
+                    const inputEl = document.getElementById('qe_opt_' + l);
+                    if (inputEl) inputEl.value = opt.text || '';
+                    if (opt.is_correct) correctOpt = opt.letter.toUpperCase();
+                });
+                document.getElementById('qe_correct_option').value = correctOpt;
+                document.getElementById('qe_explanation').value = data.explanation || '';
+
+            } else if (data.question_type === 'THEORY') {
+                if (theorySection) {
+                    theorySection.style.display = 'block';
+                    document.getElementById('qe_keywords').value = data.keywords || '';
+                    document.getElementById('qe_theory_explanation').value = data.explanation || '';
+                }
+
+            } else if (data.question_type === 'CODING') {
+                codingSection.style.display = 'block';
+                document.getElementById('qe_input_format').value = data.input_format || '';
+                document.getElementById('qe_output_format').value = data.output_format || '';
+                document.getElementById('qe_constraints').value = data.constraints || '';
+
+                // Populate sample test cases
+                const sampleContainer = document.getElementById('qe_sample_cases_list');
+                sampleContainer.innerHTML = '';
+                if (data.sample_cases && data.sample_cases.length > 0) {
+                    data.sample_cases.forEach((tc, idx) => {
+                        addQeTestCase('sample', tc.input, tc.output);
+                    });
+                } else {
+                    addQeTestCase('sample', '', '');
+                }
+
+                // Populate hidden test cases
+                const hiddenContainer = document.getElementById('qe_hidden_cases_list');
+                hiddenContainer.innerHTML = '';
+                if (data.hidden_cases && data.hidden_cases.length > 0) {
+                    data.hidden_cases.forEach((tc, idx) => {
+                        addQeTestCase('hidden', tc.input, tc.output);
+                    });
+                } else {
+                    const emptyDiv = document.createElement('div');
+                    emptyDiv.className = 'text-muted small p-3 text-center border rounded bg-white empty-tc-msg mb-2';
+                    emptyDiv.innerHTML = `
+                        <i class="bi bi-info-circle me-1 text-danger"></i>No hidden test cases. 
+                        <a href="javascript:void(0)" class="fw-bold text-decoration-none ms-1 text-danger" onclick="addQeTestCase('hidden')">
+                            + Add Hidden Test Case
+                        </a>
+                    `;
+                    hiddenContainer.appendChild(emptyDiv);
+                }
+
+            } else if (data.question_type === 'PRACTICAL') {
+                practicalSection.style.display = 'block';
+                document.getElementById('qe_evaluation_criteria').value = data.evaluation_criteria || '';
+            }
+
+            document.getElementById('qe_loading_spinner').style.display = 'none';
+            document.getElementById('quickEditQuestionForm').style.display = 'flex';
+        })
+        .catch(err => {
+            document.getElementById('qe_loading_spinner').innerHTML = `
+                <div class="text-danger my-3"><i class="bi bi-exclamation-triangle-fill fs-2"></i></div>
+                <div class="text-danger fw-semibold">${err.message || 'Error loading question details.'}</div>
+                <button type="button" class="btn btn-sm btn-outline-secondary mt-3" data-bs-dismiss="modal">Close</button>
+            `;
+        });
+}
+
+function addQeTestCase(type, inputVal = '', outputVal = '') {
+    const isSample = (type === 'sample');
+    const container = document.getElementById(isSample ? 'qe_sample_cases_list' : 'qe_hidden_cases_list');
+    const emptyMsg = container.querySelector('.empty-tc-msg');
+    if (emptyMsg) emptyMsg.remove();
+
+    const count = container.querySelectorAll('.qe-test-case-row').length + 1;
+    const prefix = isSample ? 'sample' : 'hidden';
+    const borderClass = isSample ? 'border-primary-subtle' : 'border-danger-subtle';
+    const badgeClass = isSample ? 'bg-primary' : 'bg-danger';
+
+    const row = document.createElement('div');
+    row.className = `card p-2 mb-2 bg-white ${borderClass} shadow-sm qe-test-case-row`;
+    row.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="badge ${badgeClass}"><i class="bi bi-terminal me-1"></i>${isSample ? 'Sample' : 'Hidden'} Test Case #${count}</span>
+            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" onclick="removeQeTestCase(this)" title="Remove Test Case">
+                <i class="bi bi-trash"></i> Remove
+            </button>
+        </div>
+        <div class="row g-2">
+            <div class="col-6">
+                <label class="form-label small text-muted mb-0">Input</label>
+                <textarea class="form-control form-control-sm font-monospace" name="${prefix}_inputs[]" rows="2" placeholder="Input values...">${inputVal || ''}</textarea>
+            </div>
+            <div class="col-6">
+                <label class="form-label small text-muted mb-0">Expected Output</label>
+                <textarea class="form-control form-control-sm font-monospace" name="${prefix}_outputs[]" rows="2" placeholder="Expected output...">${outputVal || ''}</textarea>
+            </div>
+        </div>
+    `;
+    container.appendChild(row);
+}
+
+function removeQeTestCase(btn) {
+    const row = btn.closest('.qe-test-case-row');
+    const container = row.parentElement;
+    const isSample = container.id.includes('sample');
+    row.remove();
+
+    const remainingRows = container.querySelectorAll('.qe-test-case-row');
+    if (remainingRows.length === 0) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'text-muted small p-3 text-center border rounded bg-white empty-tc-msg mb-2';
+        emptyDiv.innerHTML = `
+            <i class="bi bi-info-circle me-1 text-${isSample ? 'primary' : 'danger'}"></i>No ${isSample ? 'sample' : 'hidden'} test cases. 
+            <a href="javascript:void(0)" class="fw-bold text-decoration-none ms-1 text-${isSample ? 'primary' : 'danger'}" onclick="addQeTestCase('${isSample ? 'sample' : 'hidden'}')">
+                + Add ${isSample ? 'Sample' : 'Hidden'} Test Case
+            </a>
+        `;
+        container.appendChild(emptyDiv);
+    } else {
+        remainingRows.forEach((r, idx) => {
+            const badge = r.querySelector('.badge');
+            if (badge) {
+                badge.innerHTML = `<i class="bi bi-terminal me-1"></i>${isSample ? 'Sample' : 'Hidden'} Test Case #${idx + 1}`;
+            }
+        });
+    }
+}
+
+function handleQuickEditSubmit(e) {
+    e.preventDefault();
+    const form = document.getElementById('quickEditQuestionForm');
+    const submitBtn = document.getElementById('qe_submit_btn');
+    const alertBox = document.getElementById('qe_alert_box');
+    const qId = document.getElementById('qe_question_id').value;
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+    alertBox.className = 'alert d-none mb-3 py-2 small';
+
+    const formData = new FormData(form);
+
+    fetch('/trainer/question/' + qId + '/edit/', {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData
+    })
+    .then(res => {
+        if (!res.ok) throw new Error('Server returned error while saving.');
+        return res.json();
+    })
+    .then(data => {
+        if (data.success) {
+            // Update question in the list without reloading page!
+            const textEl = document.getElementById('q_text_' + qId);
+            if (textEl) {
+                textEl.textContent = data.question_text;
+            }
+
+            const marksEl = document.getElementById('q_marks_' + qId);
+            if (marksEl) {
+                marksEl.textContent = data.marks + ' Marks';
+            }
+
+            const metaEl = document.getElementById('q_meta_' + qId);
+            if (metaEl) {
+                metaEl.innerHTML = `Type: ${data.type_display} &bull; Topic: ${data.topic} &bull; Difficulty: ${data.difficulty}`;
+            }
+
+            // Also check if there is an exam total marks recalculation function
+            if (typeof recalculateExamTotalMarks === 'function') {
+                recalculateExamTotalMarks();
+            }
+
+            // Close modal
+            const modalEl = document.getElementById('quickEditQuestionModal');
+            const bsModal = bootstrap.Modal.getInstance(modalEl);
+            if (bsModal) {
+                bsModal.hide();
+            }
+
+            showToastNotification(`Question Q${data.question_id} updated successfully!`);
+        } else {
+            throw new Error(data.error || 'Failed to update question.');
+        }
+    })
+    .catch(err => {
+        alertBox.className = 'alert alert-danger mb-3 py-2 small';
+        alertBox.textContent = err.message || 'Error occurred while saving question.';
+    })
+    .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Save Changes';
+    });
+}
+</script>

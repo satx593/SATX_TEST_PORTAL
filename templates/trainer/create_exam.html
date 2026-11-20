@@ -1,6 +1,6 @@
 {% extends 'base/base.html' %}
 
-{% block title %}Create Examination - PUMO Technovation{% endblock %}
+{% block title %}Create Examination - SATX{% endblock %}
 
 {% block content %}
 <div class="container py-4">
@@ -92,7 +92,12 @@
             <div class="col-lg-7">
                 <div class="card card-pumo mb-4">
                     <div class="card-header card-header-pumo d-flex justify-content-between align-items-center">
-                        <span><i class="bi bi-check2-square me-2 text-primary"></i>Select Questions from Question Bank</span>
+                        <div class="form-check d-flex align-items-center mb-0">
+                            <input class="form-check-input me-2" type="checkbox" id="selectAllQuestions" onchange="toggleSelectAll(this)" style="cursor: pointer;">
+                            <label class="form-check-label fw-bold text-primary mb-0" for="selectAllQuestions" style="cursor: pointer;">
+                                <i class="bi bi-check2-square me-1"></i>Select Questions from Question Bank
+                            </label>
+                        </div>
                         <span class="badge bg-light text-primary border" id="selectedCountBadge">0 Selected</span>
                     </div>
                     <div class="card-body p-0" style="max-height: 520px; overflow-y: auto;">
@@ -103,10 +108,18 @@
                                     <input class="form-check-input q-checkbox" type="checkbox" name="selected_questions" value="{{ q.id }}" id="q_{{ q.id }}" onchange="updateSelectedCount()">
                                     <label class="form-check-label w-100" for="q_{{ q.id }}">
                                         <div class="d-flex justify-content-between align-items-start">
-                                            <div class="fw-semibold text-primary">{{ q.question_text }}</div>
-                                            <span class="badge bg-light text-dark border ms-2">{{ q.marks }} Marks</span>
+                                            <div class="fw-semibold text-primary">
+                                                <span class="badge bg-secondary me-1">Q{{ forloop.counter }}</span>
+                                                <span id="q_text_{{ q.id }}">{{ q.question_text }}</span>
+                                            </div>
+                                            <div class="d-flex align-items-center gap-1 ms-2 flex-shrink-0">
+                                                <span class="badge bg-light text-dark border" id="q_marks_{{ q.id }}">{{ q.marks }} Marks</span>
+                                                <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" onclick="event.preventDefault(); event.stopPropagation(); openQuickEditModal({{ q.id }})" title="Edit Question Details">
+                                                    <i class="bi bi-pencil-square"></i> Edit
+                                                </button>
+                                            </div>
                                         </div>
-                                        <small class="text-muted">
+                                        <small class="text-muted" id="q_meta_{{ q.id }}">
                                             Type: {{ q.get_question_type_display }} &bull; Topic: {{ q.topic }} &bull; Difficulty: {{ q.difficulty }}
                                         </small>
                                     </label>
@@ -126,6 +139,8 @@
         </div>
     </form>
 </div>
+
+{% include 'trainer/_quick_edit_modal.html' %}
 {% endblock %}
 
 {% block extra_js %}
@@ -136,9 +151,28 @@
     document.getElementById('startTime').value = now.toISOString().slice(0, 16);
     document.getElementById('endTime').value = nextWeek.toISOString().slice(0, 16);
 
-    function updateSelectedCount() {
-        const checked = document.querySelectorAll('.q-checkbox:checked').length;
-        document.getElementById('selectedCountBadge').innerText = checked + ' Selected';
+    function toggleSelectAll(master) {
+        const checkboxes = document.querySelectorAll('.q-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = master.checked;
+        });
+        updateSelectedCount();
     }
+
+    function updateSelectedCount() {
+        const all = document.querySelectorAll('.q-checkbox');
+        const checked = document.querySelectorAll('.q-checkbox:checked');
+        const badge = document.getElementById('selectedCountBadge');
+        if (badge) {
+            badge.innerText = checked.length + ' Selected';
+        }
+        const master = document.getElementById('selectAllQuestions');
+        if (master) {
+            master.checked = (all.length > 0 && checked.length === all.length);
+            master.indeterminate = (checked.length > 0 && checked.length < all.length);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', updateSelectedCount);
 </script>
 {% endblock %}
