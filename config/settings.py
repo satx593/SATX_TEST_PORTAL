@@ -15,14 +15,28 @@ load_dotenv(BASE_DIR / '.env')
 
 # Security settings
 SECRET_KEY = os.getenv('SECRET_KEY')
+
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY environment variable is missing")
+
 DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 't')
 
-ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*').split(',') if h.strip()] + ['testserver']
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.getenv(
+        'ALLOWED_HOSTS',
+        'satx-test-portal.vercel.app'
+    ).split(',')
+    if h.strip()
+] + ['testserver']
+
 CSRF_TRUSTED_ORIGINS = [
-    origin.strip() for origin in os.getenv(
+    origin.strip()
+    for origin in os.getenv(
         'CSRF_TRUSTED_ORIGINS',
-        'http://localhost:8000,http://127.0.0.1:8000,http://localhost,http://127.0.0.1'
-    ).split(',') if origin.strip()
+        'https://satx-test-portal.vercel.app'
+    ).split(',')
+    if origin.strip()
 ]
 
 # Application definition
@@ -138,9 +152,9 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Cloudinary media storage
 CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': os.getenv(' tyrkfkt1'),
-    'API_KEY': os.getenv('978753624346979'),
-    'API_SECRET': os.getenv('xNe-VSeSM24ekzo586kSet9Urys'),
+    'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME'),
+    'API_KEY': os.getenv('CLOUDINARY_API_KEY'),
+    'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
 }
 
 STORAGES = {
