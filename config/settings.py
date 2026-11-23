@@ -138,15 +138,13 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 
-# Cloudinary Media Storage
-# Cloudinary configuration
+# Cloudinary media storage
 CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': os.environ.get('tyrkfkt1'),
-    'API_KEY': os.environ.get('978753624346979'),
-    'API_SECRET': os.environ.get('xNe-VSeSM24ekzo586kSet9Urys'),
+    'CLOUD_NAME': os.getenv('tyrkfkt1'),
+    'API_KEY': os.getenv('978753624346979'),
+    'API_SECRET': os.getenv('xNe-VSeSM24ekzo586kSet9Urys'),
 }
 
-# Storage configuration
 STORAGES = {
     'default': {
         'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
@@ -155,7 +153,6 @@ STORAGES = {
         'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
     },
 }
-
 # Authentication URLs
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard_redirect'
