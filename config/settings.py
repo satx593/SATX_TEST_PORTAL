@@ -34,6 +34,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'cloudinary',
+    'cloudinary_storage',
 
     # Core Portal Apps (Simple, unified architecture)
     'accounts.apps.AccountsConfig',
@@ -130,8 +132,39 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Media files (PDFs, Practical Submissions, Proctoring logs)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# Static files (CSS, JavaScript, Images)
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+
+# Cloudinary Media Storage
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.getenv('tyrkfkt1'),
+    'API_KEY': os.getenv('978753624346979'),
+    'API_SECRET': os.getenv('xNe-VSeSM24ekzo586kSet9Urys'),
+}
+
+STORAGES = {
+    'default': {
+        'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+    },
+}
+
+
+# Authentication URLs
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'dashboard_redirect'
+LOGOUT_REDIRECT_URL = 'login'
+
+# Session & Security Settings
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_AGE = 86400  # 24 hours
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+CSRF_COOKIE_HTTPONLY = False
 
 # Authentication URLs
 LOGIN_URL = 'login'
@@ -165,7 +198,7 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'satx593@gmail.com')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', 'rlhs wwkg yfga ljph')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', f"SATX Exam Portal <{os.getenv('EMAIL_HOST_USER', 'noreply@satx.edu')}>")
 
-# OCR & Execution Service Settings
+# OCR & Execution Service Settingsx
 TESSERACT_CMD = os.getenv('TESSERACT_CMD', r'C:\Program Files\Tesseract-OCR\tesseract.exe')
 JUDGE0_API_URL = os.getenv('JUDGE0_API_URL', '')
 JUDGE0_API_KEY = os.getenv('JUDGE0_API_KEY', '')
