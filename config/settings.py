@@ -33,10 +33,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
     'cloudinary',
     'cloudinary_storage',
-
     'rest_framework',
     'accounts.apps.AccountsConfig',
     'portal.apps.PortalConfig',
@@ -140,7 +138,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Cloudinary media storage
 CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': os.getenv('tyrkfkt1'),
+    'CLOUD_NAME': os.getenv(' tyrkfkt1'),
     'API_KEY': os.getenv('978753624346979'),
     'API_SECRET': os.getenv('xNe-VSeSM24ekzo586kSet9Urys'),
 }
