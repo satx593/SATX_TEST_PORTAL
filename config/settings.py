@@ -14,8 +14,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
 # Security settings
-SECRET_KEY = os.getenv('SECRET_KEY', 'pumo-exam-portal-secret-key-sarathy-thirumal-2026')
-DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 't')
+SECRET_KEY = os.getenv('SECRET_KEY')
+DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 't')
 
 ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*').split(',') if h.strip()] + ['testserver']
 CSRF_TRUSTED_ORIGINS = [
@@ -33,11 +33,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'rest_framework',
+
     'cloudinary',
     'cloudinary_storage',
 
-    # Core Portal Apps (Simple, unified architecture)
+    'rest_framework',
     'accounts.apps.AccountsConfig',
     'portal.apps.PortalConfig',
     'exams.apps.ExamsConfig',
@@ -139,12 +139,14 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 
 # Cloudinary Media Storage
+# Cloudinary configuration
 CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': os.getenv('tyrkfkt1'),
-    'API_KEY': os.getenv('978753624346979'),
-    'API_SECRET': os.getenv('xNe-VSeSM24ekzo586kSet9Urys'),
+    'CLOUD_NAME': os.environ.get('tyrkfkt1'),
+    'API_KEY': os.environ.get('978753624346979'),
+    'API_SECRET': os.environ.get('xNe-VSeSM24ekzo586kSet9Urys'),
 }
 
+# Storage configuration
 STORAGES = {
     'default': {
         'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
@@ -153,7 +155,6 @@ STORAGES = {
         'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
     },
 }
-
 
 # Authentication URLs
 LOGIN_URL = 'login'
