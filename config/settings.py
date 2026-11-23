@@ -76,12 +76,14 @@ WSGI_APPLICATION = 'config.wsgi.application'
 AUTH_USER_MODEL = 'accounts.User'
 
 # Database Configuration (MySQL 8 with fallback support if needed)
+# Database Configuration - Railway MySQL
+
 DB_ENGINE = os.getenv('DB_ENGINE', 'django.db.backends.mysql')
-DB_NAME = os.getenv('DB_NAME', 'satx_exam_portal')
+DB_NAME = os.getenv('DB_NAME', 'railway')
 DB_USER = os.getenv('DB_USER', 'root')
-DB_PASSWORD = os.getenv('DB_PASSWORD', 'root')
-DB_HOST = os.getenv('DB_HOST', '127.0.0.1')
-DB_PORT = os.getenv('DB_PORT', '3306')
+DB_PASSWORD = os.getenv('DB_PASSWORD', 'XcmTrqqqRicZVuSPCRTRlYLJPRybOaAh')
+DB_HOST = os.getenv('DB_HOST', 'reseau.proxy.rlwy.net')
+DB_PORT = os.getenv('DB_PORT', '48337')
 
 DATABASES = {
     'default': {
@@ -95,6 +97,7 @@ DATABASES = {
             'charset': 'utf8mb4',
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
         },
+        'CONN_MAX_AGE': 0,
     }
 }
 
