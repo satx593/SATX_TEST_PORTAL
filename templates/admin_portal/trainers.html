@@ -25,6 +25,7 @@
                             <th>Employee ID</th>
                             <th>Specialization</th>
                             <th>Email</th>
+                            <th>Handled Courses</th>
                             <th>Status</th>
                             <th class="text-end pe-3">Actions</th>
                         </tr>
@@ -46,6 +47,17 @@
                             <td><span class="badge bg-light text-dark border">{{ trainer.trainer_profile.employee_id|default:"N/A" }}</span></td>
                             <td>{{ trainer.trainer_profile.specialization|default:"General Technical" }}</td>
                             <td>{{ trainer.email|default:"-" }}</td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-1">
+                                    {% for c in trainer.get_handled_courses %}
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-semibold">
+                                        <i class="bi bi-journal-code me-1"></i>{{ c.code }}
+                                    </span>
+                                    {% empty %}
+                                    <span class="badge bg-light text-muted border">None Assigned</span>
+                                    {% endfor %}
+                                </div>
+                            </td>
                             <td>
                                 {% if trainer.is_active %}
                                     <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
@@ -126,6 +138,27 @@
                                                     </select>
                                                 </div>
                                                 <div class="col-12">
+                                                    <label class="form-label small fw-semibold"><i class="bi bi-journal-bookmark me-1 text-primary"></i>Assigned Courses / Domains</label>
+                                                    <div class="card p-2 bg-light border">
+                                                        <div class="row g-2">
+                                                            {% for c in courses %}
+                                                            <div class="col-md-6">
+                                                                <div class="form-check">
+                                                                    <input class="form-check-input" type="checkbox" name="courses" value="{{ c.id }}" id="edit_course_{{ trainer.id }}_{{ c.id }}"
+                                                                           {% if c in trainer.assigned_courses.all %}checked{% endif %}>
+                                                                    <label class="form-check-label small" for="edit_course_{{ trainer.id }}_{{ c.id }}">
+                                                                        <strong>{{ c.code }}</strong> - {{ c.name }}
+                                                                    </label>
+                                                                </div>
+                                                            </div>
+                                                            {% empty %}
+                                                            <div class="col-12 text-muted small">No active courses found.</div>
+                                                            {% endfor %}
+                                                        </div>
+                                                    </div>
+                                                    <small class="text-muted">Select the courses this trainer handles. They will only see students and exams for these courses.</small>
+                                                </div>
+                                                <div class="col-12">
                                                     <label class="form-label small fw-semibold">Reset Password</label>
                                                     <input type="password" class="form-control" name="password" placeholder="Leave blank to keep existing password">
                                                     <small class="text-muted">Only enter a new password if you want to reset this trainer's login credentials.</small>
@@ -175,7 +208,7 @@
                         </div>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center py-5 text-muted">
+                            <td colspan="7" class="text-center py-5 text-muted">
                                 <i class="bi bi-people fs-1 d-block mb-2 text-muted"></i>
                                 No trainers created yet. Click "Add New Trainer" to register one.
                             </td>
@@ -232,6 +265,26 @@
                         <div class="col-md-6">
                             <label class="form-label small fw-semibold">Department</label>
                             <input type="text" class="form-control" name="department" value="Technical Training">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold"><i class="bi bi-journal-bookmark me-1 text-primary"></i>Assigned Courses / Domains</label>
+                            <div class="card p-2 bg-light border">
+                                <div class="row g-2">
+                                    {% for c in courses %}
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="courses" value="{{ c.id }}" id="create_course_{{ c.id }}">
+                                            <label class="form-check-label small" for="create_course_{{ c.id }}">
+                                                <strong>{{ c.code }}</strong> - {{ c.name }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {% empty %}
+                                    <div class="col-12 text-muted small">No active courses found. Create courses first in Courses Catalog.</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <small class="text-muted">Select the courses this trainer handles. They will only see students and exams for these courses.</small>
                         </div>
                     </div>
                 </div>

@@ -90,6 +90,28 @@ class StudentProfile(models.Model):
     def __str__(self):
         return f"{self.user.get_full_name() or self.user.username} ({self.reg_no})"
 
+    def get_trainers(self):
+        """Returns distinct list of trainers who handle this student's course or batch."""
+        trainers = []
+        seen = set()
+        if self.course:
+            for t in self.course.get_trainers():
+                if t.id not in seen:
+                    seen.add(t.id)
+                    trainers.append(t)
+        if self.batch:
+            for t in self.batch.get_all_trainers():
+                if t.id not in seen:
+                    seen.add(t.id)
+                    trainers.append(t)
+        return trainers
+
+    def get_trainers_display(self):
+        trs = self.get_trainers()
+        if not trs:
+            return "Unassigned"
+        return ", ".join([t.get_full_name() or t.username for t in trs])
+
 
 class AuditLog(models.Model):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)

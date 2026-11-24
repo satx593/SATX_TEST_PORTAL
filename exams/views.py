@@ -1,6 +1,7 @@
 import json
 import io
 import os
+import tempfile
 from decimal import Decimal
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
@@ -100,8 +101,9 @@ def _process_test_cases(post_data):
 
 @trainer_required
 def question_bank(request):
-    """Question Bank with filtering, searching, and manual creation."""
-    courses = Course.objects.filter(is_active=True)
+    """Question Bank with filtering, searching, and manual creation, isolated by course."""
+    handled_courses = request.user.get_handled_courses().filter(is_active=True)
+    visible_questions = request.user.get_visible_questions()
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -114,7 +116,18 @@ def question_bank(request):
             explanation = request.POST.get('explanation', '').strip()
             correct_opt = request.POST.get('correct_option', 'A')
 
-            course = Course.objects.filter(id=course_id).first() if course_id else None
+            course = None
+            if course_id:
+                course = handled_courses.filter(id=course_id).first()
+                if not course and not request.user.is_super_admin:
+                    messages.error(request, "Permission Denied: You cannot create questions for a course you do not handle.")
+                    return redirect('question_bank')
+            elif not request.user.is_super_admin:
+                if handled_courses.count() == 1:
+                    course = handled_courses.first()
+                else:
+                    messages.error(request, "Please select one of your assigned courses.")
+                    return redirect('question_bank')
 
             q = Question.objects.create(
                 question_type='MCQ_SINGLE',
@@ -138,7 +151,7 @@ def question_bank(request):
                         is_correct=(letter == correct_opt)
                     )
 
-            messages.success(request, "MCQ Question added to Question Bank.")
+            messages.success(request, f"MCQ Question added to Question Bank ({course.code if course else 'General'}).")
             return redirect('question_bank')
 
         elif action == 'create_coding':
@@ -152,7 +165,18 @@ def question_bank(request):
             constraints = request.POST.get('constraints', '').strip()
             sample_in, sample_out, hidden_in, hidden_out = _process_test_cases(request.POST)
 
-            course = Course.objects.filter(id=course_id).first() if course_id else None
+            course = None
+            if course_id:
+                course = handled_courses.filter(id=course_id).first()
+                if not course and not request.user.is_super_admin:
+                    messages.error(request, "Permission Denied: You cannot create questions for a course you do not handle.")
+                    return redirect('question_bank')
+            elif not request.user.is_super_admin:
+                if handled_courses.count() == 1:
+                    course = handled_courses.first()
+                else:
+                    messages.error(request, "Please select one of your assigned courses.")
+                    return redirect('question_bank')
 
             Question.objects.create(
                 question_type='CODING',
@@ -171,7 +195,7 @@ def question_bank(request):
                 created_by=request.user,
                 is_approved=True
             )
-            messages.success(request, "Coding Problem with test cases added to Question Bank.")
+            messages.success(request, f"Coding Problem with test cases added to Question Bank ({course.code if course else 'General'}).")
             return redirect('question_bank')
 
         elif action == 'create_practical':
@@ -180,7 +204,18 @@ def question_bank(request):
             marks = int(request.POST.get('marks', 20))
             eval_criteria = request.POST.get('evaluation_criteria', '')
 
-            course = Course.objects.filter(id=course_id).first() if course_id else None
+            course = None
+            if course_id:
+                course = handled_courses.filter(id=course_id).first()
+                if not course and not request.user.is_super_admin:
+                    messages.error(request, "Permission Denied: You cannot create questions for a course you do not handle.")
+                    return redirect('question_bank')
+            elif not request.user.is_super_admin:
+                if handled_courses.count() == 1:
+                    course = handled_courses.first()
+                else:
+                    messages.error(request, "Please select one of your assigned courses.")
+                    return redirect('question_bank')
 
             Question.objects.create(
                 question_type='PRACTICAL',
@@ -191,7 +226,7 @@ def question_bank(request):
                 created_by=request.user,
                 is_approved=True
             )
-            messages.success(request, "Practical Task added to Question Bank.")
+            messages.success(request, f"Practical Task added to Question Bank ({course.code if course else 'General'}).")
             return redirect('question_bank')
 
         elif action == 'create_theory':
@@ -203,7 +238,18 @@ def question_bank(request):
             keywords = request.POST.get('keywords', '').strip()
             explanation = request.POST.get('explanation', '').strip()
 
-            course = Course.objects.filter(id=course_id).first() if course_id else None
+            course = None
+            if course_id:
+                course = handled_courses.filter(id=course_id).first()
+                if not course and not request.user.is_super_admin:
+                    messages.error(request, "Permission Denied: You cannot create questions for a course you do not handle.")
+                    return redirect('question_bank')
+            elif not request.user.is_super_admin:
+                if handled_courses.count() == 1:
+                    course = handled_courses.first()
+                else:
+                    messages.error(request, "Please select one of your assigned courses.")
+                    return redirect('question_bank')
 
             Question.objects.create(
                 question_type='THEORY',
@@ -217,18 +263,21 @@ def question_bank(request):
                 created_by=request.user,
                 is_approved=True
             )
-            messages.success(request, "Theory Question added to Question Bank.")
+            messages.success(request, f"Theory Question added to Question Bank ({course.code if course else 'General'}).")
             return redirect('question_bank')
 
         elif action == 'edit_question':
             q_id = request.POST.get('question_id')
-            q = get_object_or_404(Question, id=q_id)
+            q = get_object_or_404(visible_questions, id=q_id)
             q.question_text = request.POST.get('question_text', '').strip()
             q.topic = request.POST.get('topic', '').strip() or 'General'
             q.difficulty = request.POST.get('difficulty', 'MEDIUM')
             q.marks = int(request.POST.get('marks', 1))
             course_id = request.POST.get('course')
-            q.course = Course.objects.filter(id=course_id).first() if course_id else None
+            if course_id:
+                new_course = handled_courses.filter(id=course_id).first()
+                if new_course or request.user.is_super_admin:
+                    q.course = new_course
 
             if q.question_type == 'MCQ_SINGLE':
                 q.explanation = request.POST.get('explanation', '').strip()
@@ -263,7 +312,7 @@ def question_bank(request):
 
         elif action == 'delete_question':
             q_id = request.POST.get('question_id')
-            q = get_object_or_404(Question, id=q_id)
+            q = get_object_or_404(visible_questions, id=q_id)
             q.delete()
             messages.success(request, "Question deleted from Question Bank.")
             referer = request.META.get('HTTP_REFERER')
@@ -273,26 +322,31 @@ def question_bank(request):
 
         elif action == 'bulk_delete_questions':
             q_ids = request.POST.getlist('question_ids')
-            deleted_count, _ = Question.objects.filter(id__in=q_ids).delete()
+            deleted_count, _ = visible_questions.filter(id__in=q_ids).delete()
             messages.success(request, f"{deleted_count} question(s) deleted from the Question Bank.")
             return redirect('question_bank')
 
     # Filter questions
     q_type = request.GET.get('type')
     q_diff = request.GET.get('diff')
+    q_course = request.GET.get('course')
     q_query = request.GET.get('q')
 
-    questions = Question.objects.filter(is_approved=True).prefetch_related('options').order_by('id')
+    questions = visible_questions.filter(is_approved=True).select_related('course').prefetch_related('options').order_by('id')
     if q_type:
         questions = questions.filter(question_type=q_type)
     if q_diff:
         questions = questions.filter(difficulty=q_diff)
+    if q_course and q_course.isdigit():
+        questions = questions.filter(course_id=int(q_course))
     if q_query:
         questions = questions.filter(question_text__icontains=q_query)
 
     return render(request, 'trainer/question_bank.html', {
         'questions': questions,
-        'courses': courses,
+        'courses': handled_courses,
+        'selected_course': q_course,
+        'has_handled_courses': handled_courses.exists(),
     })
 
 
@@ -302,7 +356,7 @@ def quick_edit_question(request, question_id):
     AJAX & Form handler to edit any Question directly from
     Create Exam, Edit Exam, or Question Bank.
     """
-    q = get_object_or_404(Question, id=question_id)
+    q = get_object_or_404(request.user.get_visible_questions(), id=question_id)
 
     if request.method == 'POST':
         q.question_text = request.POST.get('question_text', '').strip()
@@ -311,7 +365,9 @@ def quick_edit_question(request, question_id):
         q.marks = int(request.POST.get('marks', q.marks or 1))
         course_id = request.POST.get('course')
         if course_id:
-            q.course = Course.objects.filter(id=course_id).first()
+            new_course = request.user.get_handled_courses().filter(id=course_id).first()
+            if new_course or request.user.is_super_admin:
+                q.course = new_course
 
         if q.question_type == 'MCQ_SINGLE':
             q.explanation = request.POST.get('explanation', '').strip()
@@ -367,7 +423,7 @@ def quick_edit_question(request, question_id):
 @trainer_required
 def get_question_json(request, question_id):
     """Return complete question data as JSON for the interactive Edit modal."""
-    q = get_object_or_404(Question, id=question_id)
+    q = get_object_or_404(request.user.get_visible_questions(), id=question_id)
     options = [{'letter': o.option_letter, 'text': o.option_text, 'is_correct': o.is_correct} for o in q.options.all().order_by('option_letter')]
 
     return JsonResponse({
@@ -391,75 +447,155 @@ def get_question_json(request, question_id):
     })
 
 
+
 @trainer_required
 def pdf_import(request):
-    """Upload PDF question paper, extract text/options, and display for review."""
-    courses = Course.objects.filter(is_active=True)
+    """Upload PDF question paper, extract questions, and display for review."""
+    courses = request.user.get_handled_courses().filter(is_active=True)
 
     if request.method == 'POST':
         pdf_file = request.FILES.get('pdf_file')
         course_id = request.POST.get('course')
-        course = Course.objects.filter(id=course_id).first() if course_id else None
+        course = courses.filter(id=course_id).first() if course_id else None
 
-        if not pdf_file or not pdf_file.name.endswith('.pdf'):
+        if not course and not request.user.is_super_admin:
+            if courses.count() == 1:
+                course = courses.first()
+            else:
+                messages.error(
+                    request,
+                    "Please select one of your assigned courses."
+                )
+                return redirect('pdf_import')
+
+        if not pdf_file or not pdf_file.name.lower().endswith('.pdf'):
             messages.error(request, "Please upload a valid PDF document.")
             return redirect('pdf_import')
 
-        # Create import record
+        # Create import record using existing remote storage
         import_rec = PDFQuestionImport.objects.create(
             trainer=request.user,
             pdf_file=pdf_file,
             status='PENDING'
         )
 
-        extracted_items, err = extract_questions_from_pdf(import_rec.pdf_file.path)
-        if err or not extracted_items:
+        try:
+            # Download PDF from Cloudinary/remote storage
+            # and temporarily save it inside Vercel's /tmp directory.
+            with import_rec.pdf_file.open("rb") as pdf:
+                with tempfile.NamedTemporaryFile(
+                    mode="wb",
+                    suffix=".pdf",
+                    dir="/tmp"
+                ) as temp_pdf:
+
+                    while True:
+                        chunk = pdf.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        temp_pdf.write(chunk)
+
+                    temp_pdf.flush()
+
+                    # IMPORTANT: Extract before closing temp_pdf.
+                    extracted_items, err = extract_questions_from_pdf(
+                        temp_pdf.name
+                    )
+
+            if err or not extracted_items:
+                import_rec.status = 'FAILED'
+                import_rec.error_message = (
+                    err or "Could not extract structured questions."
+                )
+                import_rec.save()
+
+                messages.error(
+                    request,
+                    f"Extraction warning: {import_rec.error_message}"
+                )
+                return redirect('pdf_import')
+
+        except Exception as e:
             import_rec.status = 'FAILED'
-            import_rec.error_message = err or "Could not extract structured questions."
+            import_rec.error_message = str(e)
             import_rec.save()
-            messages.error(request, f"Extraction warning: {import_rec.error_message}")
+
+            messages.error(
+                request,
+                f"PDF processing failed: {str(e)}"
+            )
             return redirect('pdf_import')
 
         # Create unapproved questions for trainer review
         created_count = 0
-        for item in extracted_items:
-            q = Question.objects.create(
-                question_type='MCQ_SINGLE',
-                course=course,
-                topic='PDF Import',
-                question_text=item['text'],
-                marks=item.get('marks', 1),
-                created_by=request.user,
-                is_approved=False
-            )
-            corr_letter = item.get('correct_answer')
-            for opt_letter, opt_val in item['options'].items():
-                QuestionOption.objects.create(
-                    question=q,
-                    option_letter=opt_letter,
-                    option_text=opt_val,
-                    is_correct=(opt_letter == corr_letter)
+
+        try:
+            for item in extracted_items:
+                q = Question.objects.create(
+                    question_type='MCQ_SINGLE',
+                    course=course,
+                    topic='PDF Import',
+                    question_text=item['text'],
+                    marks=item.get('marks', 1),
+                    created_by=request.user,
+                    is_approved=False
                 )
-            created_count += 1
 
-        import_rec.status = 'EXTRACTED'
-        import_rec.extracted_count = created_count
-        import_rec.save()
+                corr_letter = item.get('correct_answer')
 
-        messages.success(request, f"Extracted {created_count} questions from '{pdf_file.name}'. Please review and approve them below.")
+                for opt_letter, opt_val in item['options'].items():
+                    QuestionOption.objects.create(
+                        question=q,
+                        option_letter=opt_letter,
+                        option_text=opt_val,
+                        is_correct=(opt_letter == corr_letter)
+                    )
+
+                created_count += 1
+
+            import_rec.status = 'EXTRACTED'
+            import_rec.extracted_count = created_count
+            import_rec.save()
+
+        except Exception as e:
+            import_rec.status = 'FAILED'
+            import_rec.error_message = str(e)
+            import_rec.save()
+
+            messages.error(
+                request,
+                f"Question saving failed: {str(e)}"
+            )
+            return redirect('pdf_import')
+
+        messages.success(
+            request,
+            f"Extracted {created_count} questions from "
+            f"'{pdf_file.name}' for course "
+            f"{course.code if course else 'General'}. "
+            "Please review and approve them below."
+        )
+
         return redirect('pdf_review', import_id=import_rec.id)
 
-    recent_imports = PDFQuestionImport.objects.filter(trainer=request.user).order_by('-uploaded_at')[:10]
+    recent_imports = PDFQuestionImport.objects.filter(
+        trainer=request.user
+    ).order_by('-uploaded_at')[:10]
+
     return render(request, 'trainer/pdf_import.html', {
         'courses': courses,
-        'recent_imports': recent_imports
+        'recent_imports': recent_imports,
+        'has_handled_courses': courses.exists(),
     })
 
 
 @trainer_required
 def pdf_review(request, import_id=0):
     """Trainer approval interface for extracted PDF questions with approve and delete/cancel options."""
-    pending_questions = Question.objects.filter(created_by=request.user, is_approved=False).prefetch_related('options').order_by('id')
+    visible_courses = request.user.get_handled_courses()
+    pending_questions = Question.objects.filter(is_approved=False).prefetch_related('options').order_by('id')
+    if not request.user.is_super_admin:
+        pending_questions = pending_questions.filter(Q(created_by=request.user) | Q(course__in=visible_courses)).distinct()
 
     if request.method == 'POST':
         action = request.POST.get('action')

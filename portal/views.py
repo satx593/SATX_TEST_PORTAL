@@ -58,6 +58,7 @@ def admin_trainers(request):
             last_name = request.POST.get('last_name', '').strip()
             employee_id = request.POST.get('employee_id', '').strip()
             specialization = request.POST.get('specialization', '').strip()
+            course_ids = request.POST.getlist('courses') or request.POST.getlist('courses[]')
 
             if User.objects.filter(username=username).exists():
                 messages.error(request, f"Username '{username}' already exists.")
@@ -78,10 +79,12 @@ def admin_trainers(request):
                     specialization=specialization,
                     department='Technical Training'
                 )
+                if course_ids:
+                    user.assigned_courses.set(course_ids)
                 AuditLog.objects.create(
                     user=request.user,
                     action='TRAINER_CREATED',
-                    details=f"Created trainer {username} ({employee_id})"
+                    details=f"Created trainer {username} ({employee_id}) with {len(course_ids)} assigned courses"
                 )
                 messages.success(request, f"Trainer '{username}' created successfully.")
             return redirect('admin_trainers')
@@ -97,6 +100,7 @@ def admin_trainers(request):
             department = request.POST.get('department', 'Technical Training').strip()
             new_password = request.POST.get('password', '').strip()
             is_active = request.POST.get('is_active') in ('on', 'true', '1', True, 'ACTIVE')
+            course_ids = request.POST.getlist('courses') or request.POST.getlist('courses[]')
 
             if employee_id and TrainerProfile.objects.filter(employee_id=employee_id).exclude(user=trainer_user).exists():
                 messages.error(request, f"Employee ID '{employee_id}' is already registered to another trainer.")
@@ -108,6 +112,7 @@ def admin_trainers(request):
                 if new_password:
                     trainer_user.set_password(new_password)
                 trainer_user.save()
+                trainer_user.assigned_courses.set(course_ids)
 
                 profile, _ = TrainerProfile.objects.get_or_create(user=trainer_user)
                 if employee_id:
@@ -146,15 +151,16 @@ def admin_trainers(request):
             messages.info(request, f"Trainer '{trainer_user.username}' has been {status_text}.")
             return redirect('admin_trainers')
 
-    trainers = User.objects.filter(role='TRAINER').select_related('trainer_profile').order_by('-date_joined')
-    return render(request, 'admin_portal/trainers.html', {'trainers': trainers})
+    trainers = User.objects.filter(role='TRAINER').select_related('trainer_profile').prefetch_related('assigned_courses').order_by('-date_joined')
+    courses = Course.objects.filter(is_active=True).order_by('name')
+    return render(request, 'admin_portal/trainers.html', {'trainers': trainers, 'courses': courses})
 
 
 @trainer_required
 def admin_students(request):
-    """Student account management with search, filter, credential emails, and bulk CSV upload. Accessible by Admins and Trainers."""
-    courses = Course.objects.filter(is_active=True)
-    batches = Batch.objects.filter(is_active=True)
+    """Student account management with search, filter, credential emails, and bulk CSV upload. Accessible by Admins and Trainers with course-based isolation."""
+    handled_courses = request.user.get_handled_courses().filter(is_active=True)
+    handled_batches = request.user.get_handled_batches().filter(is_active=True)
     redirect_target = request.path
 
     if request.method == 'POST':
@@ -170,14 +176,27 @@ def admin_students(request):
             course_id = request.POST.get('course')
             batch_id = request.POST.get('batch')
 
+            # Validate course permission for trainer
+            course = None
+            if course_id:
+                course = handled_courses.filter(id=course_id).first()
+                if not course and not request.user.is_super_admin:
+                    messages.error(request, "Permission Denied: You cannot assign students to a course you do not handle.")
+                    return redirect(redirect_target)
+            elif not request.user.is_super_admin:
+                if handled_courses.count() == 1:
+                    course = handled_courses.first()
+                else:
+                    messages.error(request, "Please select one of your assigned courses for this student.")
+                    return redirect(redirect_target)
+
+            batch = handled_batches.filter(id=batch_id).first() if batch_id else None
+
             if User.objects.filter(username=username).exists():
                 messages.error(request, f"Username '{username}' already exists.")
             elif StudentProfile.objects.filter(reg_no=reg_no).exists():
                 messages.error(request, f"Registration No '{reg_no}' is already registered.")
             else:
-                course = Course.objects.filter(id=course_id).first() if course_id else None
-                batch = Batch.objects.filter(id=batch_id).first() if batch_id else None
-
                 user = User.objects.create_user(
                     username=username,
                     email=email,
@@ -192,10 +211,19 @@ def admin_students(request):
                     course=course,
                     batch=batch
                 )
+
+                # Auto-assign active exams for this course & batch
+                if course:
+                    active_exams = Exam.objects.filter(course=course, status__in=['PUBLISHED', 'SCHEDULED'])
+                    if batch:
+                        active_exams = active_exams.filter(Q(batch=batch) | Q(batch__isnull=True))
+                    for ex in active_exams:
+                        ExamAssignment.objects.get_or_create(exam=ex, student=user)
+
                 AuditLog.objects.create(
                     user=request.user,
                     action='STUDENT_CREATED',
-                    details=f"{request.user.role} {request.user.username} created student {username} ({reg_no})"
+                    details=f"{request.user.role} {request.user.username} created student {username} ({reg_no}) for course {course.code if course else 'None'}"
                 )
 
                 # Send welcome email with credentials
@@ -211,7 +239,12 @@ def admin_students(request):
 
         elif action == 'edit':
             student_id = request.POST.get('student_id')
-            student_user = get_object_or_404(User, id=student_id, role='STUDENT')
+            # Security: Ensure trainers can only edit their own students
+            if request.user.is_super_admin:
+                student_user = get_object_or_404(User, id=student_id, role='STUDENT')
+            else:
+                student_user = get_object_or_404(request.user.get_visible_students(), id=student_id)
+
             first_name = request.POST.get('first_name', '').strip()
             last_name = request.POST.get('last_name', '').strip()
             email = request.POST.get('email', '').strip()
@@ -220,6 +253,14 @@ def admin_students(request):
             batch_id = request.POST.get('batch')
             new_password = request.POST.get('password', '').strip()
             is_active = request.POST.get('is_active') in ('on', 'true', '1', True, 'ACTIVE')
+
+            course = None
+            if course_id:
+                course = handled_courses.filter(id=course_id).first()
+                if not course and not request.user.is_super_admin:
+                    messages.error(request, "Permission Denied: You cannot assign students to a course you do not handle.")
+                    return redirect(redirect_target)
+            batch = handled_batches.filter(id=batch_id).first() if batch_id else None
 
             if reg_no and StudentProfile.objects.filter(reg_no=reg_no).exclude(user=student_user).exists():
                 messages.error(request, f"Registration No '{reg_no}' is already registered to another candidate.")
@@ -237,9 +278,17 @@ def admin_students(request):
                 profile, _ = StudentProfile.objects.get_or_create(user=student_user)
                 if reg_no:
                     profile.reg_no = reg_no
-                profile.course = Course.objects.filter(id=course_id).first() if course_id else None
-                profile.batch = Batch.objects.filter(id=batch_id).first() if batch_id else None
+                profile.course = course
+                profile.batch = batch
                 profile.save()
+
+                # Sync exam assignments if course/batch changed
+                if course:
+                    active_exams = Exam.objects.filter(course=course, status__in=['PUBLISHED', 'SCHEDULED'])
+                    if batch:
+                        active_exams = active_exams.filter(Q(batch=batch) | Q(batch__isnull=True))
+                    for ex in active_exams:
+                        ExamAssignment.objects.get_or_create(exam=ex, student=student_user)
 
                 AuditLog.objects.create(
                     user=request.user,
@@ -256,6 +305,17 @@ def admin_students(request):
 
         elif action == 'bulk_upload':
             csv_file = request.FILES.get('csv_file')
+            bulk_course_id = request.POST.get('course')
+            bulk_batch_id = request.POST.get('batch')
+
+            bulk_course = None
+            if bulk_course_id:
+                bulk_course = handled_courses.filter(id=bulk_course_id).first()
+            elif not request.user.is_super_admin and handled_courses.count() == 1:
+                bulk_course = handled_courses.first()
+
+            bulk_batch = handled_batches.filter(id=bulk_batch_id).first() if bulk_batch_id else None
+
             if not csv_file or not csv_file.name.endswith('.csv'):
                 messages.error(request, "Please upload a valid CSV file.")
                 return redirect(redirect_target)
@@ -274,7 +334,7 @@ def admin_students(request):
                 lname = row.get('last_name', '').strip()
                 email = row.get('email', '').strip()
 
-                if uname and rno and not User.objects.filter(username=uname).exists():
+                if uname and rno and not User.objects.filter(username=uname).exists() and not StudentProfile.objects.filter(reg_no=rno).exists():
                     u = User.objects.create_user(
                         username=uname,
                         email=email,
@@ -283,7 +343,16 @@ def admin_students(request):
                         first_name=fname,
                         last_name=lname
                     )
-                    StudentProfile.objects.create(user=u, reg_no=rno)
+                    StudentProfile.objects.create(
+                        user=u,
+                        reg_no=rno,
+                        course=bulk_course,
+                        batch=bulk_batch
+                    )
+                    if bulk_course:
+                        for ex in Exam.objects.filter(course=bulk_course, status__in=['PUBLISHED', 'SCHEDULED']):
+                            ExamAssignment.objects.get_or_create(exam=ex, student=u)
+
                     created_count += 1
                     if email:
                         sent, _ = send_student_welcome_email(u, pwd, request=request)
@@ -300,18 +369,21 @@ def admin_students(request):
 
         elif action == 'bulk_deactivate':
             student_ids = request.POST.getlist('student_ids')
-            count = User.objects.filter(id__in=student_ids, role='STUDENT').update(is_active=False)
+            # Security: restrict to visible students
+            allowed_ids = list(request.user.get_visible_students().filter(id__in=student_ids).values_list('id', flat=True))
+            count = User.objects.filter(id__in=allowed_ids, role='STUDENT').update(is_active=False)
             AuditLog.objects.create(
                 user=request.user,
                 action='STUDENTS_BULK_DEACTIVATED',
-                details=f"{request.user.role} {request.user.username} deactivated {count} student account(s). IDs: {student_ids}"
+                details=f"{request.user.role} {request.user.username} deactivated {count} student account(s)."
             )
             messages.warning(request, f"{count} student account(s) deactivated.")
             return redirect(redirect_target)
 
         elif action == 'bulk_delete_students':
             student_ids = request.POST.getlist('student_ids')
-            users_to_delete = User.objects.filter(id__in=student_ids, role='STUDENT')
+            # Security: restrict to visible students
+            users_to_delete = request.user.get_visible_students().filter(id__in=student_ids)
             count = users_to_delete.count()
             names = list(users_to_delete.values_list('username', flat=True))
             users_to_delete.delete()
@@ -325,27 +397,40 @@ def admin_students(request):
 
     # Filtering
     query = request.GET.get('q', '').strip()
-    batch_filter = request.GET.get('batch', '')
+    course_filter = request.GET.get('course', '').strip()
+    batch_filter = request.GET.get('batch', '').strip()
 
-    students = User.objects.filter(role='STUDENT').select_related('student_profile', 'student_profile__batch', 'student_profile__course')
+    students = request.user.get_visible_students().select_related(
+        'student_profile', 'student_profile__batch', 'student_profile__course'
+    ).prefetch_related('student_profile__course__trainers')
+
     total_student_count = students.count()
     active_student_count = students.filter(is_active=True).count()
     inactive_student_count = total_student_count - active_student_count
 
+    if course_filter and course_filter.isdigit():
+        students = students.filter(student_profile__course_id=int(course_filter))
+    if batch_filter and batch_filter.isdigit():
+        students = students.filter(student_profile__batch_id=int(batch_filter))
     if query:
-        students = students.filter(username__icontains=query) | students.filter(first_name__icontains=query) | students.filter(student_profile__reg_no__icontains=query)
-    if batch_filter:
-        students = students.filter(student_profile__batch_id=batch_filter)
+        students = students.filter(
+            Q(username__icontains=query) |
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query) |
+            Q(student_profile__reg_no__icontains=query)
+        )
 
     return render(request, 'admin_portal/students.html', {
         'students': students.order_by('-date_joined'),
-        'courses': courses,
-        'batches': batches,
+        'courses': handled_courses,
+        'batches': handled_batches,
         'query': query,
+        'course_filter': course_filter,
         'batch_filter': batch_filter,
         'total_student_count': total_student_count,
         'active_student_count': active_student_count,
         'inactive_student_count': inactive_student_count,
+        'has_handled_courses': handled_courses.exists(),
     })
 
 
