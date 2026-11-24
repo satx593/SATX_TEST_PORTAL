@@ -30,28 +30,33 @@ from exams.pdf_parser import extract_questions_from_pdf
 
 @trainer_required
 def trainer_dashboard(request):
-    """Trainer main control dashboard."""
-    assigned_batches = Batch.objects.filter(Q(trainer=request.user) | Q(trainers=request.user)).distinct()
-    my_exams = Exam.objects.filter(created_by=request.user)
+    """Trainer main control dashboard isolated to courses handled by this trainer."""
+    handled_courses = request.user.get_handled_courses().filter(is_active=True)
+    assigned_batches = request.user.get_handled_batches().filter(is_active=True)
+    my_exams = request.user.get_visible_exams().select_related('course', 'batch').order_by('-created_at')
     active_exams = my_exams.filter(status='PUBLISHED')
-    total_questions = Question.objects.filter(created_by=request.user).count()
-    pending_approvals = Question.objects.filter(created_by=request.user, is_approved=False).count()
-    total_alerts = ProctoringEvent.objects.filter(session__exam__created_by=request.user, is_reviewed=False).count()
-    total_students_count = User.objects.filter(role='STUDENT').count()
-    assigned_students_count = User.objects.filter(
-        role='STUDENT',
-        student_profile__batch__in=assigned_batches
+    total_questions = request.user.get_visible_questions().count()
+    pending_approvals = Question.objects.filter(is_approved=False).filter(
+        Q(created_by=request.user) | Q(course__in=handled_courses)
     ).distinct().count()
+    total_alerts = ProctoringEvent.objects.filter(
+        session__exam__course__in=handled_courses, is_reviewed=False
+    ).count() if not request.user.is_super_admin else ProctoringEvent.objects.filter(is_reviewed=False).count()
+    assigned_students_count = request.user.get_visible_students().count()
+    total_students_count = assigned_students_count if not request.user.is_super_admin else User.objects.filter(role='STUDENT').count()
 
     context = {
+        'handled_courses': handled_courses,
         'assigned_batches': assigned_batches,
         'my_exams': my_exams[:5],
+        'total_exams_count': my_exams.count(),
         'active_exams_count': active_exams.count(),
         'total_questions': total_questions,
         'pending_approvals': pending_approvals,
         'total_alerts': total_alerts,
         'total_students_count': total_students_count,
         'assigned_students_count': assigned_students_count,
+        'has_handled_courses': handled_courses.exists(),
     }
     return render(request, 'trainer/dashboard.html', context)
 
@@ -653,10 +658,10 @@ def pdf_review(request, import_id=0):
 
 @trainer_required
 def create_exam(request):
-    """Exam scheduler and question picker."""
-    courses = Course.objects.filter(is_active=True)
-    batches = Batch.objects.filter(is_active=True)
-    approved_questions = Question.objects.filter(is_approved=True)
+    """Exam scheduler and question picker isolated to trainer's handled courses."""
+    courses = request.user.get_handled_courses().filter(is_active=True)
+    batches = request.user.get_handled_batches().filter(is_active=True)
+    approved_questions = request.user.get_visible_questions().filter(is_approved=True).select_related('course')
 
     if request.method == 'POST':
         title = request.POST.get('title', '').strip()
@@ -673,12 +678,12 @@ def create_exam(request):
 
         selected_q_ids = request.POST.getlist('selected_questions')
 
-        course = get_object_or_404(Course, id=course_id)
-        batch = Batch.objects.filter(id=batch_id).first() if batch_id else None
+        course = get_object_or_404(courses, id=course_id)
+        batch = batches.filter(id=batch_id).first() if batch_id else None
 
         # Preserve exact question sequence from the form (matches PDF extraction order)
         int_ids = [int(qid) for qid in selected_q_ids if str(qid).isdigit()]
-        q_dict = {q.id: q for q in Question.objects.filter(id__in=int_ids)}
+        q_dict = {q.id: q for q in approved_questions.filter(id__in=int_ids)}
         ordered_questions = [q_dict[qid] for qid in int_ids if qid in q_dict]
 
         total_marks = sum(q.marks for q in ordered_questions)
@@ -704,47 +709,64 @@ def create_exam(request):
         for idx, q in enumerate(ordered_questions, start=1):
             ExamQuestion.objects.create(exam=exam, question=q, order=idx, marks=q.marks)
 
-        # Assign to students in batch
+        # Assign to students:
+        # If batch is specified, assign to students of that batch
+        # If no batch, assign to ALL students enrolled in this course
         if batch:
-            for student_profile in batch.students.all():
-                ExamAssignment.objects.get_or_create(exam=exam, student=student_profile.user)
+            target_students = batch.students.all()
+        else:
+            target_students = course.students.all()
 
-        messages.success(request, f"Exam '{title}' created and published successfully!")
+        for student_profile in target_students:
+            ExamAssignment.objects.get_or_create(exam=exam, student=student_profile.user)
+
+        messages.success(request, f"Exam '{title}' created and published successfully for {course.code}!")
         return redirect('trainer_dashboard')
 
     return render(request, 'trainer/create_exam.html', {
         'courses': courses,
         'batches': batches,
-        'questions': approved_questions.order_by('id')
+        'questions': approved_questions.order_by('id'),
+        'has_handled_courses': courses.exists(),
     })
 
 
 @trainer_required
 def live_monitoring(request):
-    """Trainer view of active sessions and proctoring telemetry."""
-    active_sessions = ExamSession.objects.filter(is_submitted=False).select_related('exam', 'student')
-    proctoring_alerts = ProctoringEvent.objects.select_related('session__student', 'session__exam').order_by('-timestamp')[:50]
+    """Trainer view of active sessions and proctoring telemetry isolated by handled courses."""
+    visible_courses = request.user.get_handled_courses()
+    if request.user.is_super_admin:
+        active_sessions = ExamSession.objects.filter(is_submitted=False).select_related('exam', 'exam__course', 'student')
+        proctoring_alerts = ProctoringEvent.objects.select_related('session__student', 'session__exam', 'session__exam__course').order_by('-timestamp')[:50]
+    else:
+        active_sessions = ExamSession.objects.filter(
+            is_submitted=False, exam__course__in=visible_courses
+        ).select_related('exam', 'exam__course', 'student')
+        proctoring_alerts = ProctoringEvent.objects.filter(
+            session__exam__course__in=visible_courses
+        ).select_related('session__student', 'session__exam', 'session__exam__course').order_by('-timestamp')[:50]
 
     return render(request, 'trainer/live_monitoring.html', {
         'active_sessions': active_sessions,
-        'proctoring_alerts': proctoring_alerts
+        'proctoring_alerts': proctoring_alerts,
+        'has_handled_courses': visible_courses.exists(),
     })
 
 
 @trainer_required
 def manage_exams(request):
-    """Trainer list of all their exams with edit/delete actions."""
-    exams = Exam.objects.filter(created_by=request.user).select_related('course', 'batch').order_by('-created_at')
+    """Trainer list of all their exams with edit/delete actions, isolated by course."""
+    exams = request.user.get_visible_exams().select_related('course', 'batch').order_by('-created_at')
     return render(request, 'trainer/manage_exams.html', {'exams': exams})
 
 
 @trainer_required
 def edit_exam(request, exam_id):
     """Edit an existing exam — title, batch, duration, pass marks, status, and questions."""
-    exam = get_object_or_404(Exam, id=exam_id, created_by=request.user)
-    courses = Course.objects.filter(is_active=True)
-    batches = Batch.objects.filter(is_active=True)
-    approved_questions = Question.objects.filter(is_approved=True)
+    exam = get_object_or_404(request.user.get_visible_exams(), id=exam_id)
+    courses = request.user.get_handled_courses().filter(is_active=True)
+    batches = request.user.get_handled_batches().filter(is_active=True)
+    approved_questions = request.user.get_visible_questions().filter(is_approved=True).select_related('course')
     # IDs of questions already in this exam
     selected_q_ids = set(ExamQuestion.objects.filter(exam=exam).values_list('question_id', flat=True))
 
@@ -753,8 +775,9 @@ def edit_exam(request, exam_id):
         exam.description = request.POST.get('description', '').strip()
         course_id = request.POST.get('course')
         batch_id = request.POST.get('batch')
-        exam.course = get_object_or_404(Course, id=course_id) if course_id else exam.course
-        exam.batch = Batch.objects.filter(id=batch_id).first() if batch_id else None
+        if course_id:
+            exam.course = get_object_or_404(courses, id=course_id)
+        exam.batch = batches.filter(id=batch_id).first() if batch_id else None
         exam.exam_type = request.POST.get('exam_type', exam.exam_type)
         exam.duration_minutes = int(request.POST.get('duration_minutes', exam.duration_minutes))
         exam.pass_marks = int(request.POST.get('pass_marks', exam.pass_marks))
@@ -784,10 +807,14 @@ def edit_exam(request, exam_id):
         for idx, q in enumerate(ordered_questions, start=1):
             ExamQuestion.objects.create(exam=exam, question=q, order=idx, marks=q.marks)
 
-        # If batch changed, re-assign to new batch students
+        # If batch changed, re-assign to new batch students (or course students)
         if exam.batch:
-            for student_profile in exam.batch.students.all():
-                ExamAssignment.objects.get_or_create(exam=exam, student=student_profile.user)
+            target_students = exam.batch.students.all()
+        else:
+            target_students = exam.course.students.all()
+
+        for student_profile in target_students:
+            ExamAssignment.objects.get_or_create(exam=exam, student=student_profile.user)
 
         AuditLog.objects.create(
             user=request.user,
@@ -810,7 +837,7 @@ def edit_exam(request, exam_id):
 @require_POST
 def delete_exam(request, exam_id):
     """Permanently delete an exam and all associated data (sessions, answers, results)."""
-    exam = get_object_or_404(Exam, id=exam_id, created_by=request.user)
+    exam = get_object_or_404(request.user.get_visible_exams(), id=exam_id)
     exam_title = exam.title
     exam.delete()   # cascades to ExamQuestion, ExamAssignment, ExamSession, StudentAnswer, Result
     AuditLog.objects.create(
@@ -828,13 +855,39 @@ def delete_exam(request, exam_id):
 
 @student_required
 def student_dashboard(request):
-    """Student portal dashboard showing assigned examinations and scores."""
-    assignments = ExamAssignment.objects.filter(student=request.user).select_related('exam', 'exam__course')
-    completed_results = Result.objects.filter(student=request.user, is_published=True).select_related('exam')
+    """Student portal dashboard showing assigned examinations and scores for their enrolled course."""
+    profile = getattr(request.user, 'student_profile', None)
+
+    # Auto-sync exams for student's enrolled course and batch
+    if profile and profile.course:
+        applicable_exams = Exam.objects.filter(
+            course=profile.course,
+            status__in=['PUBLISHED', 'SCHEDULED', 'COMPLETED']
+        )
+        if profile.batch:
+            applicable_exams = applicable_exams.filter(Q(batch=profile.batch) | Q(batch__isnull=True))
+        for ex in applicable_exams:
+            ExamAssignment.objects.get_or_create(exam=ex, student=request.user)
+
+    if profile and profile.course:
+        assignments = ExamAssignment.objects.filter(
+            student=request.user,
+            exam__course=profile.course
+        ).select_related('exam', 'exam__course', 'exam__batch')
+        completed_results = Result.objects.filter(
+            student=request.user,
+            exam__course=profile.course,
+            is_published=True
+        ).select_related('exam', 'exam__course')
+    else:
+        assignments = ExamAssignment.objects.none()
+        completed_results = Result.objects.none()
 
     return render(request, 'student/dashboard.html', {
         'assignments': assignments,
-        'completed_results': completed_results
+        'completed_results': completed_results,
+        'student_course': profile.course if profile else None,
+        'student_batch': profile.batch if profile else None,
     })
 
 
@@ -842,9 +895,20 @@ def student_dashboard(request):
 def exam_instructions(request, exam_id):
     """Pre-exam instruction page and webcam compatibility check."""
     exam = get_object_or_404(Exam, id=exam_id, status='PUBLISHED')
+    profile = getattr(request.user, 'student_profile', None)
 
-    # Verify student assignment
-    assignment = get_object_or_404(ExamAssignment, exam=exam, student=request.user)
+    # Verify course enrollment
+    if not profile or not profile.course or exam.course_id != profile.course_id:
+        messages.error(request, "Access Denied: You are not enrolled in the course for this examination.")
+        return redirect('student_dashboard')
+
+    # Verify batch if exam is batch-specific
+    if exam.batch and profile.batch_id != exam.batch_id:
+        messages.error(request, "Access Denied: This examination is scheduled for another batch.")
+        return redirect('student_dashboard')
+
+    # Ensure assignment exists
+    assignment, _ = ExamAssignment.objects.get_or_create(exam=exam, student=request.user)
     if assignment.status == 'COMPLETED':
         messages.info(request, "You have already completed this examination.")
         return redirect('student_results')
@@ -859,7 +923,19 @@ def exam_instructions(request, exam_id):
 def take_exam(request, exam_id):
     """Distraction-free examination room with countdown timer and AI proctoring."""
     exam = get_object_or_404(Exam, id=exam_id, status='PUBLISHED')
-    assignment = get_object_or_404(ExamAssignment, exam=exam, student=request.user)
+    profile = getattr(request.user, 'student_profile', None)
+
+    # Verify course enrollment
+    if not profile or not profile.course or exam.course_id != profile.course_id:
+        messages.error(request, "Access Denied: You are not enrolled in the course for this examination.")
+        return redirect('student_dashboard')
+
+    # Verify batch if exam is batch-specific
+    if exam.batch and profile.batch_id != exam.batch_id:
+        messages.error(request, "Access Denied: This examination is scheduled for another batch.")
+        return redirect('student_dashboard')
+
+    assignment, _ = ExamAssignment.objects.get_or_create(exam=exam, student=request.user)
 
     if assignment.status == 'COMPLETED':
         messages.info(request, "You have already submitted this examination.")

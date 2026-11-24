@@ -33,7 +33,7 @@
                             <select name="course" id="qe_course" class="form-select form-select-sm">
                                 <option value="">-- General / No Course --</option>
                                 {% for c in courses %}
-                                <option value="{{ c.id }}">{{ c.name }}</option>
+                                <option value="{{ c.id }}">{{ c.code }} - {{ c.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>

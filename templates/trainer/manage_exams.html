@@ -32,7 +32,14 @@
                     <tr>
                         <td class="text-muted small">{{ forloop.counter }}</td>
                         <td>
-                            <div class="fw-semibold text-primary">{{ exam.title }}</div>
+                            <div class="d-flex align-items-center gap-1">
+                                {% if exam.course %}
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-semibold">
+                                    <i class="bi bi-journal-code me-1"></i>{{ exam.course.code }}
+                                </span>
+                                {% endif %}
+                                <span class="fw-semibold text-primary">{{ exam.title }}</span>
+                            </div>
                             <small class="text-muted">{{ exam.course.name|default:"—" }}</small>
                         </td>
                         <td><small>{{ exam.batch.name|default:"All Candidates" }}</small></td>

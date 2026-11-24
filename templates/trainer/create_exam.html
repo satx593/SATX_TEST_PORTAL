@@ -12,6 +12,16 @@
         <a href="{% url 'trainer_dashboard' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back</a>
     </div>
 
+    {% if user.is_trainer and not has_handled_courses %}
+    <div class="alert alert-warning d-flex align-items-center mb-4 border-warning shadow-sm" role="alert">
+        <i class="bi bi-exclamation-triangle-fill fs-4 me-3 text-warning"></i>
+        <div>
+            <h6 class="fw-bold mb-1">No Courses Assigned</h6>
+            <p class="mb-0 small">You are currently not assigned to any technical courses. Please contact the administrator to assign you to a course (such as Python Full Stack, Java Full Stack) before creating examinations.</p>
+        </div>
+    </div>
+    {% endif %}
+
     <form method="POST">
         {% csrf_token %}
         <div class="row g-4">
@@ -33,9 +43,9 @@
                         <div class="row g-2 mb-3">
                             <div class="col-6">
                                 <label class="form-label small fw-semibold">Course</label>
-                                <select name="course" class="form-select" required>
+                                <select name="course" id="examCourseSelect" class="form-select" required onchange="filterQuestionsByCourse(this.value)">
                                     {% for c in courses %}
-                                    <option value="{{ c.id }}">{{ c.name }}</option>
+                                    <option value="{{ c.id }}">{{ c.code }} - {{ c.name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -103,13 +113,16 @@
                     <div class="card-body p-0" style="max-height: 520px; overflow-y: auto;">
                         <ul class="list-group list-group-flush">
                             {% for q in questions %}
-                            <li class="list-group-item px-3 py-2">
+                            <li class="list-group-item px-3 py-2 q-item-row" data-course-id="{{ q.course_id|default:'' }}">
                                 <div class="form-check">
                                     <input class="form-check-input q-checkbox" type="checkbox" name="selected_questions" value="{{ q.id }}" id="q_{{ q.id }}" onchange="updateSelectedCount()">
                                     <label class="form-check-label w-100" for="q_{{ q.id }}">
                                         <div class="d-flex justify-content-between align-items-start">
                                             <div class="fw-semibold text-primary">
                                                 <span class="badge bg-secondary me-1">Q{{ forloop.counter }}</span>
+                                                {% if q.course %}
+                                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle me-1">{{ q.course.code }}</span>
+                                                {% endif %}
                                                 <span id="q_text_{{ q.id }}">{{ q.question_text }}</span>
                                             </div>
                                             <div class="d-flex align-items-center gap-1 ms-2 flex-shrink-0">
@@ -174,5 +187,29 @@
     }
 
     document.addEventListener('DOMContentLoaded', updateSelectedCount);
+
+    function filterQuestionsByCourse(courseId) {
+        const rows = document.querySelectorAll('.q-item-row');
+        rows.forEach(row => {
+            const rowCourseId = row.getAttribute('data-course-id');
+            if (!courseId || !rowCourseId || rowCourseId === courseId) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+                const cb = row.querySelector('.q-checkbox');
+                if (cb && cb.checked) {
+                    cb.checked = false;
+                }
+            }
+        });
+        updateSelectedCount();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const select = document.getElementById('examCourseSelect');
+        if (select && select.value) {
+            filterQuestionsByCourse(select.value);
+        }
+    });
 </script>
 {% endblock %}

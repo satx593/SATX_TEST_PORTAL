@@ -672,7 +672,7 @@ def admin_retakes(request):
 # ==============================================================================
 
 def _get_filtered_results(request):
-    """Internal helper to retrieve and filter student exam results for UI and exports."""
+    """Internal helper to retrieve and filter student exam results for UI and exports, isolated by course for trainers."""
     results = Result.objects.select_related(
         'student',
         'student__student_profile',
@@ -682,6 +682,13 @@ def _get_filtered_results(request):
         'exam__batch',
         'session'
     ).all()
+
+    if not request.user.is_super_admin:
+        handled_courses = request.user.get_handled_courses()
+        results = results.filter(
+            Q(exam__course__in=handled_courses) |
+            Q(student__student_profile__course__in=handled_courses)
+        )
 
     exam_id = request.GET.get('exam_id', '').strip()
     batch_id = request.GET.get('batch_id', '').strip()
@@ -750,8 +757,8 @@ def admin_leaderboard(request):
     avg_score = round(sum(float(r.percentage) for r in ranked_results) / total_count, 1) if total_count > 0 else 0.0
     top_score = float(ranked_results[0].percentage) if ranked_results else 0.0
 
-    exams = Exam.objects.all().order_by('-start_time')
-    batches = Batch.objects.all().order_by('name')
+    exams = request.user.get_visible_exams().order_by('-start_time')
+    batches = request.user.get_handled_batches().order_by('name')
 
     selected_exam = None
     if exam_id and exam_id.isdigit():
@@ -1068,11 +1075,23 @@ def admin_student_single_report(request, result_id):
         id=result_id
     )
 
-    # Permission: Staff/Trainers can view any report; Students can view their own report
-    is_staff = request.user.role in ('ADMIN', 'SUPER_ADMIN', 'TRAINER') or request.user.is_superuser
-    if not is_staff and result.student != request.user:
+    # Permission: Staff/Trainers can view reports of their handled courses; Students can view their own report
+    is_admin = request.user.is_super_admin
+    is_trainer = request.user.is_trainer
+    if not is_admin and not is_trainer and result.student != request.user:
         messages.error(request, "Permission denied.")
         return redirect('student_results')
+
+    if is_trainer:
+        handled_courses = request.user.get_handled_courses()
+        course_match = result.exam.course in handled_courses
+        student_course_match = (
+            getattr(result.student, 'student_profile', None) and
+            result.student.student_profile.course in handled_courses
+        )
+        if not course_match and not student_course_match:
+            messages.error(request, "Permission Denied: You do not handle the course for this student result.")
+            return redirect('admin_leaderboard')
 
     # Fetch individual answers breakdown
     answers = []
@@ -1109,6 +1128,17 @@ def admin_toggle_answers_approval(request, result_id):
         return redirect('dashboard_redirect')
 
     result = get_object_or_404(Result, id=result_id)
+    if request.user.is_trainer:
+        handled_courses = request.user.get_handled_courses()
+        course_match = result.exam.course in handled_courses
+        student_course_match = (
+            getattr(result.student, 'student_profile', None) and
+            result.student.student_profile.course in handled_courses
+        )
+        if not course_match and not student_course_match:
+            messages.error(request, "Permission Denied: You do not handle the course for this student result.")
+            return redirect('admin_leaderboard')
+
     result.answers_approved = not result.answers_approved
     result.save()
 
