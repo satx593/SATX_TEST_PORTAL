@@ -46,6 +46,10 @@ class Question(models.Model):
     submission_format = models.CharField(max_length=100, blank=True, default='.zip, .pdf, .docx')
     evaluation_criteria = models.TextField(blank=True)
 
+    # Source PDF import tracking
+    pdf_import = models.ForeignKey('PDFQuestionImport', on_delete=models.SET_NULL, null=True, blank=True, related_name='questions')
+    pdf_name = models.CharField(max_length=255, blank=True, default='', help_text="Original PDF name if imported from PDF")
+
     class Meta:
         db_table = 'portal_questions'
         ordering = ['id']
@@ -102,6 +106,8 @@ class PDFQuestionImport(models.Model):
         ('FAILED', 'Extraction Failed'),
     )
     trainer = models.ForeignKey(User, on_delete=models.CASCADE)
+    course = models.ForeignKey(Course, on_delete=models.SET_NULL, null=True, blank=True, related_name='pdf_imports')
+    pdf_name = models.CharField(max_length=255, blank=True, default='')
     pdf_file = models.FileField(upload_to='pdf_imports/')
     uploaded_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
@@ -113,7 +119,7 @@ class PDFQuestionImport(models.Model):
         ordering = ['-uploaded_at']
 
     def __str__(self):
-        return f"PDF Import #{self.id} by {self.trainer.username} ({self.status})"
+        return f"PDF Import #{self.id} ({self.pdf_name or self.pdf_file.name}) by {self.trainer.username} ({self.status})"
 
 
 class Exam(models.Model):

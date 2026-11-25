@@ -2,8 +2,11 @@ import json
 import io
 import os
 import tempfile
+from collections import OrderedDict
+from urllib.parse import quote
 from decimal import Decimal
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.conf import settings
@@ -325,6 +328,21 @@ def question_bank(request):
                 return redirect(referer)
             return redirect('question_bank')
 
+        elif action == 'set_correct_option':
+            q_id = request.POST.get('question_id')
+            corr_letter = request.POST.get('correct_option', '').strip().upper()
+            q = get_object_or_404(visible_questions, id=q_id)
+            for opt in q.options.all():
+                opt.is_correct = (opt.option_letter.upper() == corr_letter)
+                opt.save(update_fields=['is_correct'])
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.POST.get('is_ajax') == 'true':
+                return JsonResponse({'success': True, 'question_id': q.id, 'correct_option': corr_letter})
+            messages.success(request, f"Question #{q.id} correct answer set to Option {corr_letter}.")
+            referer = request.META.get('HTTP_REFERER')
+            if referer:
+                return redirect(referer)
+            return redirect('question_bank')
+
         elif action == 'bulk_delete_questions':
             q_ids = request.POST.getlist('question_ids')
             deleted_count, _ = visible_questions.filter(id__in=q_ids).delete()
@@ -336,8 +354,18 @@ def question_bank(request):
     q_diff = request.GET.get('diff')
     q_course = request.GET.get('course')
     q_query = request.GET.get('q')
+    q_pdf = request.GET.get('pdf')
 
-    questions = visible_questions.filter(is_approved=True).select_related('course').prefetch_related('options').order_by('id')
+    all_approved = visible_questions.filter(is_approved=True)
+    pdf_sources = (
+        all_approved.exclude(pdf_name='')
+        .exclude(pdf_name__isnull=True)
+        .values_list('pdf_name', flat=True)
+        .distinct()
+        .order_by('pdf_name')
+    )
+
+    questions = all_approved.select_related('course', 'pdf_import').prefetch_related('options').order_by('id')
     if q_type:
         questions = questions.filter(question_type=q_type)
     if q_diff:
@@ -346,12 +374,66 @@ def question_bank(request):
         questions = questions.filter(course_id=int(q_course))
     if q_query:
         questions = questions.filter(question_text__icontains=q_query)
+    if q_pdf:
+        if q_pdf == '__manual__':
+            questions = questions.filter(Q(pdf_name='') | Q(pdf_name__isnull=True))
+        else:
+            questions = questions.filter(pdf_name=q_pdf)
+
+    # Group questions by PDF so each PDF is cleanly separated with its own header, stats, and #1..#N numbering
+    grouped_questions = OrderedDict()
+    for q in questions:
+        grp_key = q.pdf_name.strip() if q.pdf_name else '__manual__'
+        if grp_key not in grouped_questions:
+            grouped_questions[grp_key] = {
+                'key': grp_key,
+                'pdf_name': q.pdf_name.strip() if q.pdf_name else '',
+                'title': q.pdf_name.strip() if q.pdf_name else 'Manual / Direct Entry Questions',
+                'is_pdf': bool(q.pdf_name),
+                'course': q.course,
+                'questions': []
+            }
+        grouped_questions[grp_key]['questions'].append(q)
 
     return render(request, 'trainer/question_bank.html', {
         'questions': questions,
+        'grouped_questions': list(grouped_questions.values()),
+        'pdf_sources': pdf_sources,
+        'selected_pdf': q_pdf or '',
         'courses': handled_courses,
         'selected_course': q_course,
         'has_handled_courses': handled_courses.exists(),
+        'total_questions_count': questions.count(),
+    })
+
+
+@trainer_required
+@require_POST
+def set_question_correct_option(request, question_id):
+    """Directly select and update the correct option for an MCQ question from the Question Bank."""
+    q = get_object_or_404(request.user.get_visible_questions(), id=question_id)
+    corr_letter = request.POST.get('correct_option', '').strip().upper()
+
+    if corr_letter not in ['A', 'B', 'C', 'D', 'E', 'F']:
+        return JsonResponse({'success': False, 'error': 'Invalid option letter'}, status=400)
+
+    found = False
+    for opt in q.options.all():
+        is_curr = (opt.option_letter.upper() == corr_letter)
+        if opt.is_correct != is_curr:
+            opt.is_correct = is_curr
+            opt.save(update_fields=['is_correct'])
+        if is_curr:
+            found = True
+
+    if not found:
+        return JsonResponse({'success': False, 'error': f"Option {corr_letter} not found for Question {q.id}"}, status=404)
+
+    return JsonResponse({
+        'success': True,
+        'question_id': q.id,
+        'correct_option': corr_letter,
+        'message': f"Option {corr_letter} set as correct answer"
     })
 
 
@@ -477,9 +559,12 @@ def pdf_import(request):
             messages.error(request, "Please upload a valid PDF document.")
             return redirect('pdf_import')
 
+        pdf_orig_name = os.path.basename(getattr(pdf_file, 'name', 'Uploaded_Document.pdf'))
         # Create import record using existing remote storage
         import_rec = PDFQuestionImport.objects.create(
             trainer=request.user,
+            course=course,
+            pdf_name=pdf_orig_name,
             pdf_file=pdf_file,
             status='PENDING'
         )
@@ -539,11 +624,13 @@ def pdf_import(request):
                 q = Question.objects.create(
                     question_type='MCQ_SINGLE',
                     course=course,
-                    topic='PDF Import',
+                    topic=item.get('topic') or f"PDF: {pdf_orig_name}",
                     question_text=item['text'],
                     marks=item.get('marks', 1),
                     created_by=request.user,
-                    is_approved=False
+                    is_approved=False,
+                    pdf_import=import_rec,
+                    pdf_name=pdf_orig_name
                 )
 
                 corr_letter = item.get('correct_answer')
@@ -602,6 +689,12 @@ def pdf_review(request, import_id=0):
     if not request.user.is_super_admin:
         pending_questions = pending_questions.filter(Q(created_by=request.user) | Q(course__in=visible_courses)).distinct()
 
+    import_record = None
+    if import_id and import_id != 0:
+        import_record = PDFQuestionImport.objects.filter(id=import_id).first()
+        if import_record:
+            pending_questions = pending_questions.filter(pdf_import=import_record)
+
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'approve_single':
@@ -626,6 +719,11 @@ def pdf_review(request, import_id=0):
             q.save()
             messages.success(request, "Question approved into Question Bank with verified options.")
 
+            # If import has no more pending questions, mark it APPROVED
+            if import_record and not Question.objects.filter(pdf_import=import_record, is_approved=False).exists():
+                import_record.status = 'APPROVED'
+                import_record.save()
+
         elif action in ('delete_single', 'reject_single', 'cancel_single'):
             q_id = request.POST.get('question_id')
             q = get_object_or_404(Question, id=q_id, created_by=request.user, is_approved=False)
@@ -637,12 +735,21 @@ def pdf_review(request, import_id=0):
             for q in pending_questions:
                 q.is_approved = True
                 q.save()
+            if import_record:
+                import_record.status = 'APPROVED'
+                import_record.save()
+                messages.success(request, f"Approved all {count} questions from '{import_record.pdf_name}' into Question Bank.")
+                return redirect(f"{reverse('question_bank')}?pdf={quote(import_record.pdf_name)}")
             messages.success(request, f"Approved all {count} questions into Question Bank.")
             return redirect('question_bank')
 
         elif action in ('delete_all', 'cancel_all', 'reject_all', 'discard_all'):
             count = pending_questions.count()
             pending_questions.delete()
+            if import_record:
+                import_record.status = 'FAILED'
+                import_record.error_message = 'Discarded by trainer'
+                import_record.save()
             messages.success(request, f"Cancelled and deleted all {count} pending questions from approval queue.")
             return redirect('question_bank')
 
@@ -652,7 +759,8 @@ def pdf_review(request, import_id=0):
 
     return render(request, 'trainer/pdf_review.html', {
         'pending_questions': pending_questions,
-        'import_id': import_id
+        'import_id': import_id,
+        'import_record': import_record,
     })
 
 

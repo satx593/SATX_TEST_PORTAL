@@ -14,6 +14,7 @@ urlpatterns = [
     path('trainer/exam/<int:exam_id>/delete/', views.delete_exam, name='delete_exam'),
     path('trainer/monitoring/', views.live_monitoring, name='live_monitoring'),
     path('trainer/question/<int:question_id>/edit/', views.quick_edit_question, name='quick_edit_question'),
+    path('trainer/question/<int:question_id>/set-correct-option/', views.set_question_correct_option, name='set_question_correct_option'),
     path('trainer/question/<int:question_id>/data/', views.get_question_json, name='get_question_json'),
 
     # Student URLs
