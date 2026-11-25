@@ -39,7 +39,7 @@
     <div class="card card-pumo mb-4">
         <div class="card-body p-3">
             <form method="GET" class="row g-2 align-items-center">
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <div class="input-group">
                         <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
                         <input type="text" name="q" class="form-control" placeholder="Search question content..." value="{{ request.GET.q }}">
@@ -54,15 +54,6 @@
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <select name="pdf" class="form-select">
-                        <option value="">-- All Question Sources --</option>
-                        {% for pdf in pdf_sources %}
-                        <option value="{{ pdf }}" {% if selected_pdf == pdf %}selected{% endif %}>📄 {{ pdf }}</option>
-                        {% endfor %}
-                        <option value="__manual__" {% if selected_pdf == '__manual__' %}selected{% endif %}>✏️ Manual Entry Questions</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
                     <select name="type" class="form-select">
                         <option value="">-- All Types --</option>
                         <option value="MCQ_SINGLE" {% if request.GET.type == 'MCQ_SINGLE' %}selected{% endif %}>Single Correct MCQ</option>
@@ -71,19 +62,16 @@
                         <option value="PRACTICAL" {% if request.GET.type == 'PRACTICAL' %}selected{% endif %}>Practical Task</option>
                     </select>
                 </div>
-                <div class="col-md-1">
+                <div class="col-md-2">
                     <select name="diff" class="form-select">
-                        <option value="">-- Diff --</option>
+                        <option value="">-- Difficulty --</option>
                         <option value="EASY" {% if request.GET.diff == 'EASY' %}selected{% endif %}>Easy</option>
                         <option value="MEDIUM" {% if request.GET.diff == 'MEDIUM' %}selected{% endif %}>Medium</option>
                         <option value="HARD" {% if request.GET.diff == 'HARD' %}selected{% endif %}>Hard</option>
                     </select>
                 </div>
-                <div class="col-md-1 d-flex gap-1">
-                    <button type="submit" class="btn btn-primary w-100 px-0" title="Apply Filter"><i class="bi bi-filter"></i></button>
-                    {% if request.GET.q or selected_course or request.GET.type or request.GET.diff or selected_pdf %}
-                    <a href="{% url 'question_bank' %}" class="btn btn-outline-secondary px-2" title="Reset Filters"><i class="bi bi-x-lg"></i></a>
-                    {% endif %}
+                <div class="col-md-1">
+                    <button type="submit" class="btn btn-primary w-100 px-0"><i class="bi bi-filter"></i></button>
                 </div>
             </form>
         </div>
@@ -105,174 +93,97 @@
         </div>
     </div>
 
-    <!-- Questions List Grouped by PDF Source -->
-    {% for group in grouped_questions %}
-    <div class="card card-pumo mb-4 shadow-sm border-0 overflow-hidden" id="groupSection_{{ forloop.counter }}">
-        <div class="card-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
-            <div class="d-flex align-items-center gap-3">
-                {% if group.is_pdf %}
-                <div class="bg-danger-subtle text-danger p-2 rounded-3 fs-4 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
-                    <i class="bi bi-file-earmark-pdf-fill"></i>
-                </div>
-                <div>
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <h5 class="fw-bold mb-0 text-dark">{{ group.pdf_name }}</h5>
-                        <span class="badge bg-danger text-white rounded-pill px-2 py-1 small">PDF Document</span>
-                        {% if group.course %}
-                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-1 small">{{ group.course.code }}</span>
-                        {% endif %}
-                    </div>
-                    <small class="text-muted d-block mt-1">
-                        <i class="bi bi-collection me-1"></i>Isolated PDF Question Set &bull; {{ group.questions|length }} Question{{ group.questions|length|pluralize }} in this PDF
-                    </small>
-                </div>
-                {% else %}
-                <div class="bg-primary-subtle text-primary p-2 rounded-3 fs-4 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
-                    <i class="bi bi-pencil-square"></i>
-                </div>
-                <div>
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <h5 class="fw-bold mb-0 text-dark">{{ group.title }}</h5>
-                        <span class="badge bg-primary text-white rounded-pill px-2 py-1 small">Direct Creation</span>
-                    </div>
-                    <small class="text-muted d-block mt-1">
-                        <i class="bi bi-collection me-1"></i>Questions created manually via portal &bull; {{ group.questions|length }} Question{{ group.questions|length|pluralize }}
-                    </small>
-                </div>
-                {% endif %}
-            </div>
-            <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-light text-secondary border px-3 py-2 fw-semibold">
-                    <i class="bi bi-check2-circle me-1 text-success"></i>{{ group.questions|length }} Question{{ group.questions|length|pluralize }}
-                </span>
-                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#collapseGroup{{ forloop.counter }}" aria-expanded="true" title="Toggle Section">
-                    <i class="bi bi-chevron-down"></i>
-                </button>
-            </div>
-        </div>
-
-        <div class="collapse show" id="collapseGroup{{ forloop.counter }}">
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th style="width: 44px;">
-                                    <input type="checkbox" class="form-check-input group-master-cb" title="Select All in this Section" onchange="toggleSelectGroupQ(this)">
-                                </th>
-                                <th style="width: 50px;">#</th>
-                                <th>Question Content &amp; Options</th>
-                                <th>Course</th>
-                                <th>Type</th>
-                                <th>Topic</th>
-                                <th>Difficulty</th>
-                                <th>Marks</th>
-                                <th class="text-center" style="width: 110px;">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for q in group.questions %}
-                            <tr>
-                                <td>
-                                    <input type="checkbox" class="form-check-input q-cb" value="{{ q.id }}" onchange="updateQBulkBar()">
-                                </td>
-                                <td class="text-muted fw-bold">{{ forloop.counter }}</td>
-                                <td>
-                                    <div class="fw-semibold mb-1">{{ q.question_text }}</div>
-                                    {% if q.question_type == 'THEORY' and q.keywords %}
-                                    <div class="p-1 px-2 border rounded small bg-light text-primary mt-1">
-                                        <i class="bi bi-key-fill me-1"></i><strong>Keywords:</strong> <code>{{ q.keywords }}</code>
-                                    </div>
-                                    {% endif %}
-                                    {% if q.options.all %}
-                                    <div class="mt-2" id="qOptionsWrapper{{ q.id }}">
-                                        <div class="d-flex align-items-center justify-content-between mb-1">
-                                            <span class="text-muted small fw-semibold" style="font-size: 0.78rem;">
-                                                <i class="bi bi-check-circle me-1 text-primary"></i>Choose Correct Answer directly:
-                                            </span>
-                                            <span class="badge bg-success-subtle text-success border border-success-subtle d-none ans-saved-indicator" id="ansSaved{{ q.id }}" style="font-size: 0.72rem;">
-                                                <i class="bi bi-check2-all me-1"></i>Answer Saved
-                                            </span>
-                                        </div>
-                                        <div class="row g-2">
-                                            {% for opt in q.options.all %}
-                                            <div class="col-sm-6">
-                                                <label class="d-flex align-items-center p-2 border rounded small option-select-card {% if opt.is_correct %}bg-success-subtle text-success border-success fw-bold shadow-xs{% else %}bg-light text-dark{% endif %}"
-                                                       id="optCard_{{ q.id }}_{{ opt.option_letter }}"
-                                                       style="cursor: pointer; transition: all 0.15s ease;"
-                                                       onclick="selectCorrectOptionDirect({{ q.id }}, '{{ opt.option_letter }}', event)">
-                                                    <input type="radio" 
-                                                           class="form-check-input me-2 mt-0 flex-shrink-0 direct-ans-radio" 
-                                                           name="direct_ans_{{ q.id }}" 
-                                                           value="{{ opt.option_letter }}" 
-                                                           {% if opt.is_correct %}checked{% endif %}
-                                                           onclick="event.stopPropagation(); selectCorrectOptionDirect({{ q.id }}, '{{ opt.option_letter }}');">
-                                                    <span class="badge {% if opt.is_correct %}bg-success text-white{% else %}bg-secondary-subtle text-secondary{% endif %} me-2 opt-letter-badge" id="optBadge_{{ q.id }}_{{ opt.option_letter }}">
-                                                        {{ opt.option_letter }}
-                                                    </span>
-                                                    <span class="text-break flex-grow-1 opt-text">{{ opt.option_text }}</span>
-                                                    <span class="badge bg-success ms-1 opt-correct-icon {% if not opt.is_correct %}d-none{% endif %}" id="optCheck_{{ q.id }}_{{ opt.option_letter }}" title="Correct Answer">
-                                                        <i class="bi bi-check-lg"></i>
-                                                    </span>
-                                                </label>
-                                            </div>
-                                            {% endfor %}
+    <!-- Questions List -->
+    <div class="card card-pumo">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 44px;">
+                                <input type="checkbox" class="form-check-input" id="selectAllQ" title="Select All" onchange="toggleSelectAllQ(this)">
+                            </th>
+                            <th>#</th>
+                            <th>Question Content &amp; Options</th>
+                            <th>Course</th>
+                            <th>Type</th>
+                            <th>Topic</th>
+                            <th>Difficulty</th>
+                            <th>Marks</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for q in questions %}
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="form-check-input q-cb" value="{{ q.id }}" onchange="updateQBulkBar()">
+                            </td>
+                            <td class="text-muted small">{{ forloop.counter }}</td>
+                            <td>
+                                <div class="fw-semibold mb-1">{{ q.question_text }}</div>
+                                {% if q.question_type == 'THEORY' and q.keywords %}
+                                <div class="p-1 px-2 border rounded small bg-light text-primary mt-1">
+                                    <i class="bi bi-key-fill me-1"></i><strong>Keywords:</strong> <code>{{ q.keywords }}</code>
+                                </div>
+                                {% endif %}
+                                {% if q.options.all %}
+                                <div class="row g-2 mt-1">
+                                    {% for opt in q.options.all %}
+                                    <div class="col-sm-6">
+                                        <div class="p-1 px-2 border rounded small {% if opt.is_correct %}bg-success-subtle text-success border-success fw-bold{% else %}bg-light text-muted{% endif %}">
+                                            {{ opt.option_letter }}. {{ opt.option_text }}
+                                            {% if opt.is_correct %}<i class="bi bi-check-circle-fill ms-1"></i>{% endif %}
                                         </div>
                                     </div>
-                                    {% endif %}
-                                    {% if q.explanation %}
-                                    <small class="text-muted d-block mt-2"><i class="bi bi-info-circle me-1"></i><em>{{ q.explanation }}</em></small>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if q.course %}
-                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-semibold">
-                                            <i class="bi bi-journal-code me-1"></i>{{ q.course.code }}
-                                        </span>
-                                        <small class="d-block text-muted" style="font-size:0.72rem;">{{ q.course.name }}</small>
-                                    {% else %}
-                                        <span class="badge bg-light text-muted border">General</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if q.question_type == 'THEORY' %}
-                                    <span class="badge bg-info text-dark"><i class="bi bi-file-text me-1"></i>Theory</span>
-                                    {% else %}
-                                    <span class="badge bg-secondary">{{ q.get_question_type_display }}</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if q.pdf_name %}
-                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle text-truncate" style="max-width: 120px;" title="{{ q.pdf_name }}">
-                                        <i class="bi bi-file-earmark-pdf me-1"></i>{{ q.pdf_name }}
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                                {% if q.explanation %}
+                                <small class="text-muted d-block mt-1"><i class="bi bi-info-circle me-1"></i><em>{{ q.explanation }}</em></small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if q.course %}
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-semibold">
+                                        <i class="bi bi-journal-code me-1"></i>{{ q.course.code }}
                                     </span>
-                                    {% else %}
-                                    <small class="text-muted">{{ q.topic }}</small>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <span class="badge bg-{% if q.difficulty == 'EASY' %}success{% elif q.difficulty == 'MEDIUM' %}warning text-dark{% else %}danger{% endif %}">
-                                        {{ q.difficulty }}
-                                    </span>
-                                </td>
-                                <td class="fw-bold text-primary">{{ q.marks }}</td>
-                                <td class="text-center">
-                                    <div class="d-flex gap-1 justify-content-center">
-                                        <button type="button" class="btn btn-sm btn-outline-primary"
-                                            data-bs-toggle="modal" data-bs-target="#editQModal{{ q.id }}" title="Edit Question Details">
-                                            <i class="bi bi-pencil-fill"></i>
+                                    <small class="d-block text-muted" style="font-size:0.72rem;">{{ q.course.name }}</small>
+                                {% else %}
+                                    <span class="badge bg-light text-muted border">General</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if q.question_type == 'THEORY' %}
+                                <span class="badge bg-info text-dark"><i class="bi bi-file-text me-1"></i>Theory</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ q.get_question_type_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td><small class="text-muted">{{ q.topic }}</small></td>
+                            <td>
+                                <span class="badge bg-{% if q.difficulty == 'EASY' %}success{% elif q.difficulty == 'MEDIUM' %}warning text-dark{% else %}danger{% endif %}">
+                                    {{ q.difficulty }}
+                                </span>
+                            </td>
+                            <td class="fw-bold text-primary">{{ q.marks }}</td>
+                            <td class="text-center">
+                                <div class="d-flex gap-1 justify-content-center">
+                                    <button type="button" class="btn btn-sm btn-outline-primary"
+                                        data-bs-toggle="modal" data-bs-target="#editQModal{{ q.id }}" title="Edit Question">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                    <form method="POST" onsubmit="return confirm('Delete this question permanently?');" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="delete_question">
+                                        <input type="hidden" name="question_id" value="{{ q.id }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Question">
+                                            <i class="bi bi-trash-fill"></i>
                                         </button>
-                                        <form method="POST" onsubmit="return confirm('Delete this question permanently?');" class="d-inline">
-                                            {% csrf_token %}
-                                            <input type="hidden" name="action" value="delete_question">
-                                            <input type="hidden" name="question_id" value="{{ q.id }}">
-                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Question">
-                                                <i class="bi bi-trash-fill"></i>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
 
                         <!-- Edit Question Modal for {{ q.id }} -->
                         <div class="modal fade" id="editQModal{{ q.id }}" tabindex="-1">
@@ -483,31 +394,20 @@
                                 </div>
                             </div>
                         </div>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center py-5 text-muted">
+                                <i class="bi bi-journal-x fs-1 d-block mb-2 text-muted"></i>
+                                No questions found in the Question Bank. Click "Add Question" or "Import from PDF" above.
+                            </td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
-    {% empty %}
-    <div class="card card-pumo text-center py-5 shadow-sm">
-        <div class="card-body">
-            <i class="bi bi-journal-x fs-1 d-block mb-2 text-muted"></i>
-            <h4 class="fw-bold text-secondary">No Questions Found</h4>
-            <p class="text-muted">No questions match your current filter criteria in the Question Bank.</p>
-            {% if request.GET.q or selected_course or request.GET.type or request.GET.diff or selected_pdf %}
-            <a href="{% url 'question_bank' %}" class="btn btn-outline-primary btn-sm mt-1">
-                <i class="bi bi-arrow-counterclockwise me-1"></i>Reset All Filters
-            </a>
-            {% else %}
-            <div class="d-flex justify-content-center gap-2 mt-2">
-                <a href="{% url 'pdf_import' %}" class="btn btn-outline-danger btn-sm"><i class="bi bi-file-earmark-pdf me-1"></i>Import from PDF</a>
-                <button type="button" class="btn btn-pumo btn-sm" data-bs-toggle="modal" data-bs-target="#addMcqModal"><i class="bi bi-plus-circle me-1"></i>Add Question</button>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    {% endfor %}
+</div>
 
 <!-- Modal: Add Single MCQ -->
 <div class="modal fade" id="addMcqModal" tabindex="-1">
@@ -840,91 +740,6 @@
 
 {% block extra_js %}
 <script>
-function toggleSelectGroupQ(master) {
-    const table = master.closest('table');
-    const cbs = table.querySelectorAll('.q-cb');
-    cbs.forEach(cb => cb.checked = master.checked);
-    updateQBulkBar();
-}
-
-function selectCorrectOptionDirect(questionId, optionLetter, event) {
-    if (event) {
-        event.preventDefault();
-    }
-    // Update radio input state
-    const radio = document.querySelector(`input[name="direct_ans_${questionId}"][value="${optionLetter}"]`);
-    if (radio) {
-        radio.checked = true;
-    }
-
-    // Instantly update UI cards
-    const wrapper = document.getElementById(`qOptionsWrapper${questionId}`);
-    if (wrapper) {
-        const cards = wrapper.querySelectorAll('.option-select-card');
-        cards.forEach(card => {
-            card.classList.remove('bg-success-subtle', 'text-success', 'border-success', 'fw-bold', 'shadow-xs');
-            card.classList.add('bg-light', 'text-dark');
-        });
-        const badges = wrapper.querySelectorAll('.opt-letter-badge');
-        badges.forEach(badge => {
-            badge.classList.remove('bg-success', 'text-white');
-            badge.classList.add('bg-secondary-subtle', 'text-secondary');
-        });
-        const checks = wrapper.querySelectorAll('.opt-correct-icon');
-        checks.forEach(check => check.classList.add('d-none'));
-
-        const targetCard = document.getElementById(`optCard_${questionId}_${optionLetter}`);
-        if (targetCard) {
-            targetCard.classList.remove('bg-light', 'text-dark');
-            targetCard.classList.add('bg-success-subtle', 'text-success', 'border-success', 'fw-bold', 'shadow-xs');
-        }
-        const targetBadge = document.getElementById(`optBadge_${questionId}_${optionLetter}`);
-        if (targetBadge) {
-            targetBadge.classList.remove('bg-secondary-subtle', 'text-secondary');
-            targetBadge.classList.add('bg-success', 'text-white');
-        }
-        const targetCheck = document.getElementById(`optCheck_${questionId}_${optionLetter}`);
-        if (targetCheck) {
-            targetCheck.classList.remove('d-none');
-        }
-    }
-
-    // Also update the select dropdown in the edit modal if open
-    const modalSelect = document.querySelector(`#editQModal${questionId} select[name="correct_option"]`);
-    if (modalSelect) {
-        modalSelect.value = optionLetter;
-    }
-
-    // Persist to server via AJAX
-    const formData = new FormData();
-    formData.append('correct_option', optionLetter);
-    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-
-    fetch(`/trainer/question/${questionId}/set-correct-option/`, {
-        method: 'POST',
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: formData
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            const savedIndicator = document.getElementById(`ansSaved${questionId}`);
-            if (savedIndicator) {
-                savedIndicator.classList.remove('d-none');
-                setTimeout(() => {
-                    savedIndicator.classList.add('d-none');
-                }, 2000);
-            }
-        } else {
-            alert('Failed to update correct answer: ' + (data.error || 'Server error'));
-        }
-    })
-    .catch(err => {
-        console.error('Error saving correct answer:', err);
-    });
-}
 function toggleSelectAllQ(masterCb) {
     document.querySelectorAll('.q-cb').forEach(cb => cb.checked = masterCb.checked);
     updateQBulkBar();
